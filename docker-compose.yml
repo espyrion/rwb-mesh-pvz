@@ -1,0 +1,30 @@
+services:
+  api:
+    build: ./api
+    container_name: mesh-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: sqlite:////data/mesh.db
+      ECON_PARAMS: /app/economics/params.yaml
+      PYTHONPATH: /app
+      TZ: Europe/Moscow
+    volumes:
+      - ./api:/app
+      - ./economics:/app/economics
+      - meshdata:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+  web:
+    build: ./web
+    container_name: mesh-web
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_started
+volumes:
+  meshdata:

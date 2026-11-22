@@ -1,0 +1,11 @@
+.venv/
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.db
+*.db-journal
+.pytest_cache/
+mesh-pvz.tar.gz
+web/build/
+*.log
