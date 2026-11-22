@@ -5,7 +5,9 @@
     python3 scripts/demo.py                    # http://localhost:8000
     API_URL=http://host:8000 python3 scripts/demo.py
 
-Скрипт использует только стандартную библиотеку. Повторный запуск создаёт новые заказы.
+Скрипт использует только стандартную библиотеку и самодостаточен по данным: если нужного остатка
+нет, он принимает демо-партию на точке с максимальным запасом ячеек, поэтому прогон повторяем и на
+«грязной» базе.
 """
 from __future__ import annotations
 
@@ -42,25 +44,40 @@ def money(value) -> str:
     return f"{value:,.2f}".replace(",", " ").replace(".", ",") + " ₽"
 
 
-def pvz_map() -> dict[str, dict]:
-    return {row["code"]: row for row in call("/pvz?include_hub=true")}
+def zones() -> list[dict]:
+    return call("/pvz?include_hub=true")
 
 
-def ensure_item(code: str, price: float = 18900.0, qty: int = 10) -> dict:
-    """Берёт остаток нужной цены на ПВЗ; если его нет — принимает демо-партию (повторяемый прогон)."""
+def ensure_item(city: str = "Йошкар-Ола", price: float = 18900.0) -> dict:
+    """Остаток нужной цены в городе; если его нет — принимает демо-партию туда, где есть место."""
+    points = [row for row in zones() if row["city"] == city and not row["is_hub"]]
+    codes = {row["code"] for row in points}
     for row in call("/items"):
-        if row["stored_pvz_code"] == code and row["available_qty"] > 0 and abs(row["price_rub"] - price) < 0.01:
+        if row["stored_pvz_code"] in codes and row["available_qty"] > 0 and abs(row["price_rub"] - price) < 0.01:
             return row
-    zone = pvz_map()[code]
+    target = max(points, key=lambda row: row["free_cells"])
+    qty = min(int(target["free_cells"]) // 2, 10)
+    if qty < 1:
+        raise RuntimeError(f"в городе {city} нет свободных ячеек — освободите ПВЗ или сбросьте базу")
     return call("/items", "POST", {
         "sku": f"DEMO-{int(price)}",
         "seller_id": 1,
         "title": f"Демо-товар {int(price)} ₽",
         "qty": qty,
         "cell_size": 2,
-        "pvz_id": zone["id"],
+        "pvz_id": target["id"],
         "price_rub": price,
     })
+
+
+def destination(source_code: str) -> dict:
+    """Пункт выдачи в том же городе, отличный от источника остатка."""
+    source = next(row for row in zones() if row["code"] == source_code)
+    options = [
+        row for row in zones()
+        if row["city"] == source["city"] and not row["is_hub"] and row["id"] != source["id"]
+    ]
+    return options[0]
 
 
 def print_ledger(order_id: int) -> None:
@@ -81,14 +98,13 @@ def main() -> int:
         return 1
     print(f"API: {API} | health: {health}")
 
-    zones = pvz_map()
-    yolog, yol03, kzn = zones["YOL-01"], zones["YOL-03"], zones["KZN-01"]
+    kzn = next(row for row in zones() if row["code"] == "KZN-01")
 
     # 1. Городской заказ без хаба
     title("СЦЕНАРИЙ 1. Городской заказ без хаба")
-    item = ensure_item("YOL-01")
-    created = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": yol03["id"]})
-    order = created["order"]
+    item = ensure_item()
+    target = destination(item["stored_pvz_code"])
+    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": target["id"]})["order"]
     print(f"  Заказ {order['code']}: {order['from_code']} → {order['to_code']}")
     print(f"  Маршрут: {order['route']['kind']}, {money(order['route']['total_cost_rub'])}, {order['route']['total_hours']} ч")
     print(f"  Покупатель платит: {money(order['buyer_total_rub'])}")
@@ -99,11 +115,11 @@ def main() -> int:
 
     # 2. Межгород через хаб
     title("СЦЕНАРИЙ 2. Межгородской заказ через хаб")
-    item = ensure_item("YOL-01")
+    item = ensure_item()
     order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": kzn["id"]})["order"]
-    segments = " · ".join(f"{seg['from_code']}→{seg['to_code']}" for seg in order["route"]["segments"])
-    print(f"  Заказ {order['code']}: {segments}")
-    print(f"  Маршрут: {order['route']['kind']}, {money(order['route']['total_cost_rub'])}, {order['route']['total_hours']} ч")
+    route = order["route"]
+    print(f"  Заказ {order['code']}: " + " · ".join(f"{s['from_code']}→{s['to_code']}" for s in route["segments"]))
+    print(f"  Маршрут: {route['kind']}, {money(route['total_cost_rub'])}, {route['total_hours']} ч")
     for step in ("assemble", "transit", "issue"):
         order = call(f"/orders/{order['id']}/{step}", "POST")["order"]
         print(f"  {step}: {order['status']}")
@@ -111,8 +127,9 @@ def main() -> int:
 
     # 3. Возврат
     title("СЦЕНАРИЙ 3. Возврат после выдачи")
-    item = ensure_item("YOL-01")
-    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": yol03["id"]})["order"]
+    item = ensure_item()
+    target = destination(item["stored_pvz_code"])
+    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": target["id"]})["order"]
     call(f"/orders/{order['id']}/assemble", "POST")
     call(f"/orders/{order['id']}/issue", "POST")
     returned = call(f"/orders/{order['id']}/return", "POST")
@@ -120,44 +137,47 @@ def main() -> int:
     print(f"  Остаток вернулся: {returned['item']['qty']} шт. на ПВЗ id={returned['item']['pvz_id']}")
     print_ledger(order["id"])
 
-    # 4. Логистическая ошибка
+    # 4. Логистическая ошибка: отключаем первый сегмент действующего заказа
     title("СЦЕНАРИЙ 4. Логистическая ошибка и смена маршрута")
-    item = ensure_item("YOL-01")
-    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": yol03["id"]})["order"]
-    edge = next(row for row in call("/edges") if row["from_pvz"] == yolog["id"] and row["to_pvz"] == yol03["id"] and row["kind"] == "local")
-    result = call(f"/edges/{edge['id']}/disable", "POST")
+    item = ensure_item()
+    target = destination(item["stored_pvz_code"])
+    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": target["id"]})["order"]
+    first = order["route"]["segments"][0]
+    result = call(f"/edges/{first['edge_id']}/disable", "POST")
     incidents = result.get("incidents", [])
     updated = call(f"/orders/{order['id']}")
-    print(f"  Отключён сегмент {edge['from_code']}→{edge['to_code']} (edge #{edge['id']})")
+    print(f"  Отключён сегмент {first['from_code']}→{first['to_code']} (edge #{first['edge_id']})")
     print(f"  Инцидентов: {len(incidents)}")
     for row in incidents:
         incident = row["incident"]
         print(f"    #{incident['id']} {incident['type']} → {incident['status']}")
-    print(f"  Заказ: {updated['status']}, новый маршрут {updated['route']['kind']}, {money(updated['route']['total_cost_rub'])}, {updated['route']['total_hours']} ч")
-    call(f"/edges/{edge['id']}/enable", "POST")
+    print(f"  Заказ: {updated['status']}, новый маршрут {updated['route']['kind']}, "
+          f"{money(updated['route']['total_cost_rub'])}, {updated['route']['total_hours']} ч")
+    call(f"/edges/{first['edge_id']}/enable", "POST")
 
     # 5. Длительное хранение
     title("СЦЕНАРИЙ 5. Длительное хранение и перемещение остатка")
     advanced = call("/clock/advance?days=25", "POST")
     print(f"  Виртуальное время: {advanced['virtual_now']}")
     print(f"  Начислено за хранение: {money(advanced['charged_total_rub'])}, уведомлений: {advanced['alerts']}")
-    notes = call("/notifications?audience=pvz")
     alert = None
-    for note in notes:
+    for note in call("/notifications?audience=pvz"):
         payload = note.get("payload") or {}
         if payload.get("kind") != "long_storage" or not payload.get("offer"):
             continue
-        stored = call(f"/items/{payload['item_id']}")
-        if stored["status"] == "stored":
+        if call(f"/items/{payload['item_id']}")["status"] == "stored":
             alert = note
             break
     if alert:
         offer = alert["payload"]["offer"]
-        print(f"  Предложение: остаток #{alert['payload']['item_id']} → {offer['suggested_code']} ({offer['cells']} яч., {money(offer['cost_rub'])})")
-        moved = call(f"/items/{alert['payload']['item_id']}/relocate", "POST", {"to_pvz_id": offer["suggested_pvz_id"]})
-        print(f"  Перемещено: {moved['relocation']['cells']} яч., затраты {money(moved['relocation']['cost_rub'])} на маркетплейс")
+        print(f"  Предложение: остаток #{alert['payload']['item_id']} → {offer['suggested_code']} "
+              f"({offer['cells']} яч., {money(offer['cost_rub'])})")
+        moved = call(f"/items/{alert['payload']['item_id']}/relocate", "POST",
+                     {"to_pvz_id": offer["suggested_pvz_id"]})
+        print(f"  Перемещено: {moved['relocation']['cells']} яч., затраты "
+              f"{money(moved['relocation']['cost_rub'])} на маркетплейс")
     else:
-        print("  Предложений нет (все остатки уже в менее загруженных ПВЗ)")
+        print("  Свободных остатков для предложения нет (всё зарезервировано под заказы)")
 
     title("ГОТОВО")
     summary = call("/analytics/summary")
