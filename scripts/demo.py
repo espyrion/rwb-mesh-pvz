@@ -20,6 +20,7 @@ import urllib.request
 API = os.environ.get("API_URL", "http://localhost:8000").rstrip("/") + "/api/v1"
 API_KEY = os.environ.get("MESH_API_KEY", "demo-admin-key")
 ROOT = API[: -len("/api/v1")]
+WEB = os.environ.get("WEB_URL", "http://localhost:5173").rstrip("/")  # страница покупателя
 
 
 def call(path: str, method: str = "GET", body: dict | None = None):
@@ -189,7 +190,7 @@ def main() -> int:
     order = created["order"]
     print(f"  Заказ {order['code']}: {order['from_code']} → {order['to_code']}, "
           f"{money(order['buyer_total_rub'])}, схема {order['route']['kind']}")
-    print(f"  Ссылка покупателю: {ROOT}/?track={order['public_token']} (код заказа для поиска не годится)")
+    print(f"  Ссылка покупателю: {WEB}/?track={order['public_token']} (код заказа для поиска не годится)")
     track = call(f"/track/{order['public_token']}")
     print(f"  Покупатель видит: «{track['status_label']}», событий в истории: {len(track['timeline'])}")
     cancelled = call(f"/orders/{order['id']}/cancel", "POST")["order"]

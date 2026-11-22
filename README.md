@@ -201,7 +201,7 @@ python3 scripts/record_demo.py     # то же + docs/demo-backup.mp4 (реал�
 * [docs/SCENARIOS.md](docs/SCENARIOS.md) — 5 демо-сценариев и что проверяет каждый.
 * [docs/REPLICATION.md](docs/REPLICATION.md) — план тиражирования, метрики, риски и техплан.
 * [docs/CONTRIBUTORS.md](docs/CONTRIBUTORS.md) — вклад участников и история коммитов.
-* [docs/demo-backup.mp4](docs/demo-backup.mp4) — backup-видео: реальный прогон `scripts/demo.py` (27 с).
+* [docs/demo-backup.mp4](docs/demo-backup.mp4) — backup-видео: реальный прогон `scripts/demo.py` (30 с, включая ссылку покупателю).
 * [docs/openapi.json](docs/openapi.json) — машинночитаемая OpenAPI-схема (36 путей, схемы ответов и `ApiKey`).
 * `scripts/backup_db.py` — резервная копия SQLite без остановки API; `scripts/run_tests.sh` — все проверки.
 
