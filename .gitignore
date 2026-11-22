@@ -9,3 +9,4 @@ __pycache__/
 mesh-pvz.tar.gz
 web/build/
 *.log
+.local/
