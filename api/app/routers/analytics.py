@@ -7,9 +7,10 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from .. import clock
 from ..config import p
 from ..db import get_db
-from ..models import Incident, Item, Ledger, Order, Pvz, Seller
+from ..models import Incident, Item, Ledger, Order, Pvz, Route, Seller
 from ..serializers import pvz_dict, seller_dict
 from ..storage import utilization
 
@@ -55,25 +56,35 @@ def analytics_pvz(
 
     oq = db.query(Order).filter(Order.to_pvz == pvz_id, Order.issued_at.is_not(None))
     issued_orders = _period(oq, Order.issued_at, date_from, date_to).all()
-    aq = db.query(Order).filter(Order.from_pvz == pvz_id, Order.issued_at.is_not(None))
-    accepted_orders = _period(aq, Order.issued_at, date_from, date_to).all()
-    accepted_units = sum(o.qty for o in accepted_orders)
+    # Сборка — операция ПВЗ-источника: заказ собирают там, где лежит остаток.
+    aq = db.query(Order).filter(Order.from_pvz == pvz_id, Order.assembled_at.is_not(None))
+    assembled_here = _period(aq, Order.assembled_at, date_from, date_to).all()
+    accepted_units = sum(o.qty for o in assembled_here)
 
+    assemble_cost = float(p("logistics", "assemble_cost_rub", default=12))
+    acceptance_cost = float(p("logistics", "acceptance_cost_rub", default=8))
     op_costs = round(
-        len(issued_orders) * float(p("logistics", "assemble_cost_rub", default=12))
-        + accepted_units * float(p("logistics", "acceptance_cost_rub", default=8)),
+        len(assembled_here) * assemble_cost + accepted_units * acceptance_cost,
         2,
     )
+
+    # Постоянные затраты ПВЗ (аренда/ФОТ) не видны в ledger, но без них прибыль фиктивна.
+    now_ts = clock.now(db)
+    start_ts = datetime.fromisoformat(date_from) if date_from else clock.START
+    end_ts = (datetime.fromisoformat(date_to) + timedelta(days=1)) if date_to else now_ts
+    period_days = max(1, (end_ts - start_ts).days)
+    fixed_cost = round(float(p("pvz", "fixed_cost_day_rub", default=1200)) * period_days, 2)
     return {
         "pvz": pvz_dict(pvz),
-        "period": {"from": date_from, "to": date_to},
+        "period": {"from": date_from, "to": date_to, "days": period_days},
         "revenue": {k: round(v, 2) for k, v in sorted(revenue.items())},
         "revenue_total_rub": round(sum(revenue.values()), 2),
         "deductions": {k: round(v, 2) for k, v in sorted(deductions.items())},
         "deductions_total_rub": round(sum(deductions.values()), 2),
         "ledger_net_rub": net,
         "op_costs_modeled_rub": op_costs,
-        "profit_rub": round(net - op_costs, 2),
+        "fixed_costs_modeled_rub": fixed_cost,
+        "profit_rub": round(net - op_costs - fixed_cost, 2),
         "storage_cell_days": cell_days,
         "orders_issued": len(issued_orders),
         "accepted_units": accepted_units,
@@ -151,6 +162,11 @@ def analytics_summary(db: Session = Depends(get_db)):
     for o in orders:
         by_status[o.status] += 1
     mesh_orders = sum(1 for o in orders if o.status in ("issued", "returned") and o.route_id)
+    routes = db.query(Route).all()
+    route_kinds: dict[str, int] = defaultdict(int)
+    for r in routes:
+        route_kinds[r.kind or "unknown"] += 1
+    mesh_share = round(route_kinds.get("mesh", 0) / len(routes), 3) if routes else 0.0
     logistics_cost = round(
         -sum(r.amount_rub for r in rows if r.party == "marketplace" and r.kind == "delivery" and r.amount_rub < 0),
         2,
@@ -162,6 +178,7 @@ def analytics_summary(db: Session = Depends(get_db)):
             "mesh_or_hub": mesh_orders,
         },
         "ledger": {party: round(value, 2) for party, value in sorted(by_party.items())},
+        "routes": {"by_kind": dict(sorted(route_kinds.items())), "mesh_share": mesh_share},
         "ledger_by_kind": {party: {k: round(v, 2) for k, v in sorted(kinds.items())}
                             for party, kinds in sorted(by_party_kind.items())},
         "logistics_cost_rub": logistics_cost,

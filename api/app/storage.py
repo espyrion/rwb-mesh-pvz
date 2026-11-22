@@ -41,12 +41,13 @@ def utilization(pvz: Pvz) -> float:
     return round(pvz.used_cells / pvz.capacity_cells * 100.0, 2)
 
 
-def accrued_storage(session: Session, item_id: int) -> float:
-    rows = (
-        session.query(Ledger)
-        .filter(Ledger.item_id == item_id, Ledger.party == "pvz", Ledger.kind == "storage")
-        .all()
+def accrued_storage(session: Session, item_id: int, since=None) -> float:
+    q = session.query(Ledger).filter(
+        Ledger.item_id == item_id, Ledger.party == "pvz", Ledger.kind == "storage"
     )
+    if since is not None:
+        q = q.filter(Ledger.ts > since)
+    rows = q.all()
     return round(sum(r.amount_rub for r in rows), 2)
 
 
@@ -91,7 +92,7 @@ def evaluate_long_storage(session: Session, item: Item, now) -> dict | None:
     threshold_days = float(p("pvz", "long_storage_threshold_days", default=21))
     threshold_rub = float(p("pvz", "long_storage_threshold_rub", default=600))
     days = days_stored(item, now)
-    accrued = accrued_storage(session, item.id)
+    accrued = accrued_storage(session, item.id, since=item.accepted_at)
     if days >= threshold_days or accrued >= threshold_rub:
         return {
             "item_id": item.id,
@@ -120,7 +121,11 @@ def accrue_storage(session: Session, days: int) -> dict:
         .all()
     )
     for item in items:
-        amount = money.charge_storage(session, item, days)
+        base = item.last_accrued_at or item.accepted_at
+        elapsed = round((now - base).total_seconds() / 86400.0, 4)
+        if elapsed <= 0:
+            continue
+        amount = money.charge_storage(session, item, elapsed)
         total += amount
         per_pvz[item.stored_pvz_id] = round(per_pvz.get(item.stored_pvz_id, 0.0) + amount, 2)
         item.last_accrued_at = now
@@ -179,6 +184,9 @@ def relocate(session: Session, item: Item, to_pvz_id: int) -> dict:
     occupy(dst, cells)
     item.stored_pvz_id = dst.id
     item.last_accrued_at = clock.now(session)
+    # Перемещение начинает новый период хранения: иначе алерт о длительном хранении
+    # срабатывает сразу после переезда и порог по накопленной плате считается заново.
+    item.accepted_at = clock.now(session)
     item.relocate_alert_sent = False
     cost = money.charge_relocation(session, item, src, dst)
     notify(

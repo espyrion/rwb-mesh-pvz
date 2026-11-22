@@ -132,6 +132,25 @@ def assemble_order(order_id: int, db: Session = Depends(get_db)):
     except storage.CapacityError as exc:
         raise HTTPException(409, str(exc)) from exc
     storage.release(src, cells)
+    # Заказ может быть частью партии: отделяем проданное количество в отдельную строку,
+    # иначе остаток «телепортируется» на ПВЗ выдачи и ячейки расходятся с товаром.
+    if order.qty < item.qty:
+        remainder = Item(
+            sku=item.sku,
+            seller_id=item.seller_id,
+            title=item.title,
+            qty=item.qty - order.qty,
+            cell_size=item.cell_size,
+            stored_pvz_id=src.id,
+            accepted_at=item.accepted_at,
+            status="stored",
+            price_rub=item.price_rub,
+            last_accrued_at=item.last_accrued_at,
+            relocate_alert_sent=item.relocate_alert_sent,
+        )
+        db.add(remainder)
+        db.flush()
+        item.qty = order.qty
     item.stored_pvz_id = dst.id
     item.status = "assembled"
     order.status = "assembled"
@@ -139,7 +158,7 @@ def assemble_order(order_id: int, db: Session = Depends(get_db)):
     notify(
         db,
         "pvz",
-        f"Заказ {order.code} собран на {dst.code}: {item.qty if item.qty else order.qty} шт., ячейки перенесены.",
+        f"Заказ {order.code} собран на {dst.code}: {order.qty} шт., ячейки перенесены.",
         order_id=order.id,
         payload={"kind": "assembled", "pvz_id": dst.id, "cells": cells},
     )
@@ -178,6 +197,12 @@ def issue_order(order_id: int, db: Session = Depends(get_db)):
         return {"order": order_dict(db, order), "idempotent_replay": True}
     if order.status == "returned":
         raise HTTPException(409, "заказ уже возвращён")
+    route = db.get(Route, order.route_id)
+    if order.status == "assembled" and route is not None and route.kind != "mesh":
+        raise HTTPException(
+            409,
+            "межгородской заказ нельзя выдать до отправки: сначала POST /orders/{id}/transit",
+        )
     _transition(order, "issued")
 
     item = db.get(Item, order.item_id)

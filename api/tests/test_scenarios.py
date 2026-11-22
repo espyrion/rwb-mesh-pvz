@@ -50,7 +50,7 @@ def test_scenario_3_return(client):
     order_id, _ = issue_order(client, qty=1)
     returned = client.post(f"/api/v1/orders/{order_id}/return").json()
     assert returned["order"]["status"] == "returned"
-    assert returned["item"]["qty"] == 6
+    assert returned["item"]["qty"] == 1
     ledger = client.get("/api/v1/ledger", params={"order_id": order_id}).json()
     _report("3. Возврат после выдачи",
             order=returned["order"]["code"], status=returned["order"]["status"],

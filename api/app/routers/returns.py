@@ -47,7 +47,8 @@ def return_order(order_id: int, db: Session = Depends(get_db)):
     money.post_return(db, order, item, reverse_route)
     storage.occupy(dst, cells)
     item.stored_pvz_id = dst.id
-    item.qty += order.qty
+    # Партия могла быть разделена при сборке: возвращается ровно количество заказа.
+    item.qty = order.qty
     item.status = "returned"
     item.last_accrued_at = ts
     item.relocate_alert_sent = False

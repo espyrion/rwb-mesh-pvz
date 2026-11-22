@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from . import clock
+from .config import p
 from .models import (
     Clock,
     Edge,
@@ -25,11 +26,11 @@ from .models import (
 )
 
 PVZ_ROWS = [
-    # id, code, name, city, capacity, used, rate, op_fee
-    (1, "YOL-01", "ПВЗ Центральный", "Йошкар-Ола", 80, 35),
-    (2, "YOL-02", "ПВЗ Дубки", "Йошкар-Ола", 60, 45),
-    (3, "YOL-03", "ПВЗ Сомбатхей", "Йошкар-Ола", 70, 28),
-    (4, "YOL-04", "ПВЗ Заречный", "Йошкар-Ола", 50, 17),
+    # id, code, name, city, capacity, other_stock (ячейки чужих партий, не наших товаров)
+    (1, "YOL-01", "ПВЗ Центральный", "Йошкар-Ола", 80, 8),
+    (2, "YOL-02", "ПВЗ Дубки", "Йошкар-Ола", 60, 8),
+    (3, "YOL-03", "ПВЗ Сомбатхей", "Йошкар-Ола", 70, 8),
+    (4, "YOL-04", "ПВЗ Заречный", "Йошкар-Ола", 50, 8),
     (5, "KZN-01", "ПВЗ Баумана", "Казань", 90, 20),
     (6, "KZN-02", "ПВЗ Горки", "Казань", 60, 10),
     (7, "KZN-03", "ПВЗ Азино", "Казань", 55, 25),
@@ -67,7 +68,7 @@ def seed(session: Session) -> None:
     start = clock.START
     session.add(Clock(id=1, virtual_now=start))
 
-    for pid, code, name, city, capacity, used in PVZ_ROWS:
+    for pid, code, name, city, capacity, other_stock in PVZ_ROWS:
         session.add(
             Pvz(
                 id=pid,
@@ -75,11 +76,11 @@ def seed(session: Session) -> None:
                 name=name,
                 city=city,
                 capacity_cells=capacity,
-                used_cells=used,
+                used_cells=other_stock,
                 is_active=True,
                 is_hub=False,
-                storage_rate_day=5.0,
-                op_fee=25.0,
+                storage_rate_day=float(p("pvz", "storage_rate_day_rub")),
+                op_fee=float(p("pvz", "op_fee_rub")),
             )
         )
     hid, hcode, hname, hcity, _, _ = HUB
@@ -103,23 +104,28 @@ def seed(session: Session) -> None:
         session.add(Seller(id=sid, name=sname, commission_pct=pct))
     session.flush()
 
-    # Локальные рёбра: все упорядоченные пары ПВЗ одного города.
+    local_cost = float(p("logistics", "local_delivery_cost_rub"))
+    local_hours = float(p("logistics", "local_delivery_hours"))
     for city_pvz in ((1, 2, 3, 4), (5, 6, 7, 8)):
         for a in city_pvz:
             for b in city_pvz:
                 if a == b:
                     continue
                 session.add(
-                    Edge(from_pvz=a, to_pvz=b, kind="local", cost_rub=90.0, hours=3.0, is_active=True)
+                    Edge(from_pvz=a, to_pvz=b, kind="local", cost_rub=local_cost, hours=local_hours, is_active=True)
                 )
 
-    # Магистраль через единственный хаб:
-    # ПВЗ→хаб — обработка 70 ₽ / 4 ч; хаб→ПВЗ — магистраль 420/40 отправлений + последняя миля 55 ₽ / 26 ч.
+    # Магистраль через единственный хаб (ставки — из params.yaml):
+    # ПВЗ→хаб — обработка; хаб→ПВЗ — магистраль + последняя миля.
+    hub_cost = float(p("logistics", "hub_handling_rub"))
+    hub_hours = float(p("logistics", "hub_handling_hours"))
+    trunk_cost = float(p("logistics", "trunk_cost_per_order_rub")) + float(p("logistics", "last_mile_cost_rub"))
+    trunk_hours = float(p("logistics", "trunk_hours")) + float(p("logistics", "last_mile_hours"))
     for pid in (1, 2, 3, 4, 5, 6, 7, 8):
-        session.add(Edge(from_pvz=pid, to_pvz=hid, kind="trunk", cost_rub=70.0, hours=4.0, is_active=True))
-        session.add(Edge(from_pvz=hid, to_pvz=pid, kind="trunk", cost_rub=65.5, hours=26.0, is_active=True))
+        session.add(Edge(from_pvz=pid, to_pvz=hid, kind="trunk", cost_rub=hub_cost, hours=hub_hours, is_active=True))
+        session.add(Edge(from_pvz=hid, to_pvz=pid, kind="trunk", cost_rub=trunk_cost, hours=trunk_hours, is_active=True))
 
-    accepted = start - timedelta(days=2)
+    accepted = start
     for iid, sku, seller_id, title, qty, cell, pvz_id, price in ITEM_ROWS:
         session.add(
             Item(
@@ -137,5 +143,16 @@ def seed(session: Session) -> None:
                 relocate_alert_sent=False,
             )
         )
+
+    session.flush()
+    # used_cells выводится из партий, а не задаётся руками: иначе загрузка ПВЗ расходится с остатками.
+    for pvz in session.query(Pvz).filter(Pvz.is_hub.is_(False)).all():
+        own = sum(
+            i.cell_size * i.qty
+            for i in session.query(Item).filter(Item.stored_pvz_id == pvz.id).all()
+        )
+        pvz.used_cells += own
+        if pvz.used_cells > pvz.capacity_cells:
+            raise ValueError(f"seed: {pvz.code} переполнен ({pvz.used_cells} > {pvz.capacity_cells})")
 
     session.commit()

@@ -73,7 +73,7 @@ created → routed → assembled → in_transit → issued → returned
 | GET | `/clock` | виртуальное «сейчас» |
 | POST | `/clock/advance?days=` | сдвиг времени: начисляет хранение, рассылает уведомления |
 | GET | `/notifications?audience=&order_id=` | лента уведомлений |
-| GET | `/analytics/pvz?pvz_id=&from=&to=` | доходы, удержания, прибыль, ячейко-дни, ledger ПВЗ |
+| GET | `/analytics/pvz?pvz_id=&from=&to=` | доходы, удержания, прибыль с вычетом операционных и постоянных затрат, ячейко-дни, ledger ПВЗ |
 | GET | `/analytics/seller?seller_id=&from=&to=` | выручка, комиссия, прибыль, разрез по заказам |
 | GET | `/analytics/summary` | сводка: заказы по статусам, ledger по сторонам, логистика, инциденты |
 

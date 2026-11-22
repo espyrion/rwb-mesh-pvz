@@ -108,7 +108,7 @@ class Item(Base):
 
     __tablename__ = "item"
     __table_args__ = (
-        CheckConstraint("qty > 0", name="ck_item_qty_positive"),
+        CheckConstraint("qty >= 0", name="ck_item_qty_non_negative"),
         CheckConstraint("cell_size > 0", name="ck_item_cell_positive"),
     )
 

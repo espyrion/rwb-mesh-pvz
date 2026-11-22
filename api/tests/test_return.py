@@ -4,13 +4,15 @@ from conftest import create_order, issue_order
 
 def test_return_restores_stock_and_ledger(client):
     order_id, _ = issue_order(client)
-    assert client.get("/api/v1/items/1").json()["qty"] == 5
+    items = client.get("/api/v1/items").json()
+    rest = sum(i["qty"] for i in items if i["sku"] == "TD-1001" and i["status"] == "stored")
+    assert rest == 5  # партия разделена: 1 шт. в заказе, 5 шт. остались на ПВЗ
     response = client.post(f"/api/v1/orders/{order_id}/return")
     assert response.status_code == 200, response.text
     data = response.json()
     assert data["order"]["status"] == "returned"
     assert data["reverse_route"]["kind"] == "mesh"
-    assert data["item"]["qty"] == 6 and data["item"]["status"] == "returned"
+    assert data["item"]["qty"] == 1 and data["item"]["status"] == "returned"
     assert data["item"]["pvz_id"] == 1
     rows = client.get("/api/v1/ledger", params={"order_id": order_id}).json()
     kinds = [row["kind"] for row in rows]

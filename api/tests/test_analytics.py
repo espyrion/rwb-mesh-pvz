@@ -9,8 +9,12 @@ def test_pvz_analytics(client):
     assert data["revenue"]["pickup_fee"] == 25.0
     assert data["revenue"]["bonus"] == 15.0
     assert data["revenue_total_rub"] == 40.0
-    assert data["op_costs_modeled_rub"] == 12.0
-    assert data["profit_rub"] == 28.0
+    # Сборка и приёмка — операции ПВЗ-источника, а не пункта выдачи.
+    assert data["op_costs_modeled_rub"] == 0.0
+    assert data["fixed_costs_modeled_rub"] == 1200.0
+    assert data["profit_rub"] == -1160.0
+    src = client.get("/api/v1/analytics/pvz", params={"pvz_id": 1}).json()
+    assert src["op_costs_modeled_rub"] == 20.0  # сборка 12 + приёмка 8 за 1 шт.
     assert data["orders_issued"] == 1
     assert data["ledger"]
 

@@ -29,7 +29,20 @@ def _route_has(session: Session, route_id: int | None, edge_id: int) -> bool:
 
 
 def _touch_pvz(session: Session, order: Order, pvz_id: int) -> bool:
-    return pvz_id in (order.from_pvz, order.to_pvz)
+    if pvz_id in (order.from_pvz, order.to_pvz):
+        return True
+    if not order.route_id:
+        return False
+    route = session.get(Route, order.route_id)
+    pvz = session.get(Pvz, pvz_id)
+    if route is None or pvz is None:
+        return False
+    for seg in json.loads(route.segments_json):
+        if pvz_id in (seg.get("from"), seg.get("to")):
+            return True
+        if pvz.code in (seg.get("from_code"), seg.get("to_code")):
+            return True
+    return False
 
 
 def _open_incident(session: Session, order: Order, kind: str, description: str, edge_id: int | None = None) -> Incident:
