@@ -1,0 +1,54 @@
+# Все тарифы ниже — параметры модели для хакатонного прототипа.
+# Источник: синтетические допущения команды (ноябрь 2026), публичные диапазоны
+# стоимости логистики и хранения. НЕ являются действующим тарифом RWB.
+meta:
+  currency: RUB
+  disclaimer: "Тарифы — параметры модели, не являются действующим тарифом RWB"
+  source: "Синтетические допущения команды, ноябрь 2026"
+  prices_include_vat: true
+
+pvz:
+  capacity_cells_default: 60          # типовая ёмкость ПВЗ, ячеек
+  storage_rate_day_rub: 5.0           # плата за хранение, ₽/ячейка/день (платит маркетплейс)
+  op_fee_rub: 25.0                    # вознаграждение ПВЗ за операцию приёмки/выдачи
+  mesh_bonus_rub: 15.0                # бонус ПВЗ за заказ, обслуженный без хаба
+  long_storage_threshold_days: 21     # порог «длительного хранения», дней
+  long_storage_threshold_rub: 600.0   # альтернативный порог по накопленной плате
+  relocation_cost_rub: 60.0           # себестоимость межПВЗ-перемещения остатка
+  utilization_alert_pct: 85.0         # предупреждение о загрузке ПВЗ, %
+  accurate_stock_bonus_rub: 10.0      # бонус за точность остатков (начисляется в отчёте)
+  fixed_cost_day_rub: 1200.0          # условно-постоянные затраты ПВЗ (аренда/ФОТ), ₽/день
+  ops_per_day_capacity: 120           # пропускная способность ПВЗ, операций/день
+  avg_cells_per_order: 1.5            # среднее число ячеек на заказ (для расчётов загрузки)
+
+logistics:
+  local_delivery_cost_rub: 90.0       # себестоимость локального сегмента ПВЗ→ПВЗ
+  local_delivery_hours: 3.0
+  hub_handling_rub: 70.0              # обработка отправления на хабе (заглушка)
+  hub_handling_hours: 4.0
+  trunk_cost_per_order_rub: 10.5      # магистраль 420 ₽/рейс ÷ 40 отправлений в рейсе
+  trunk_hours: 22.0
+  last_mile_cost_rub: 55.0            # последняя миля хаб→ПВЗ
+  last_mile_hours: 4.0
+  assemble_cost_rub: 12.0             # сборка заказа на ПВЗ
+  acceptance_cost_rub: 8.0            # приёмка единицы товара на ПВЗ
+
+fees:
+  buyer_delivery_fee_local_rub: 119.0 # цена доставки для покупателя, mesh
+  buyer_delivery_fee_hub_rub: 159.0   # цена доставки для покупателя, через хаб
+  commission_pct: 12.0                # комиссия маркетплейса с товара
+  return_window_days: 7               # срок возврата после выдачи
+  return_reverse_fee_rub: 60.0        # удержание с ПВЗ за обратную логистику
+  late_penalty_rub: 50.0              # штраф за нарушение SLA
+  late_threshold_hours: 12.0
+
+buyer_acceptance:
+  max_cost_increase_pct: 10.0         # граница приемлемого удорожания для покупателя
+  max_time_increase_hours: 6.0        # граница приемлемого удлинения срока
+
+scenario_defaults:
+  goods_price_rub: 2500.0             # средняя цена товара, ₽
+  qty: 1
+  storage_days_typical: 3
+  return_rate_pct: 6.0
+  incident_rate_pct: 2.0
