@@ -272,3 +272,72 @@ class DeepHealthOut(Out):
     status: str
     checks: list[CheckOut]
     counts: dict[str, int] | None = None
+
+
+class MoneySideOut(Out):
+    """Доходы/затраты одной стороны: доходы и затраты — положительные величины."""
+
+    revenue: dict[str, float] | None = None
+    revenue_total: float | None = None
+    costs: dict[str, float] | None = None
+    costs_total: float | None = None
+    profit_rub: float | None = None
+
+
+class BuyerCostOut(Out):
+    goods_rub: float | None = None
+    delivery_fee_rub: float | None = None
+    total_rub: float | None = None
+    hours: float | None = None
+
+
+class OrderEconOut(Out):
+    kind: str
+    route: dict[str, float] | None = None
+    storage: dict[str, float] | None = None
+    buyer: BuyerCostOut | None = None
+    pvz: MoneySideOut | None = None
+    marketplace: MoneySideOut | None = None
+    seller: MoneySideOut | None = None
+    chain: dict[str, float] | None = None
+
+
+class CompareEconOut(Out):
+    buyer_delta_rub: float | None = None
+    buyer_delta_pct: float | None = None
+    buyer_delta_hours: float | None = None
+    buyer_acceptance: dict[str, Any] | None = None
+    marketplace_profit_mesh: float | None = None
+    marketplace_profit_base: float | None = None
+    pvz_profit_mesh: float | None = None
+    pvz_profit_base: float | None = None
+    chain_profit_mesh: float | None = None
+    chain_profit_base: float | None = None
+    viable: bool | None = None
+
+
+class OrderPairOut(Out):
+    mesh: OrderEconOut
+    hub: OrderEconOut
+    compare: CompareEconOut
+
+
+class PvzDayOut(MoneySideOut):
+    ops: int
+    contribution_per_op_rub: float | None = None
+    capacity_ops: int | None = None
+
+
+class BreakevenOut(Out):
+    ops: int | None = None
+    share_of_capacity: float | None = None
+    capacity_ops: int | None = None
+
+
+class ScenarioOut(Out):
+    params: dict[str, float]
+    order: OrderPairOut
+    pvz_day: PvzDayOut
+    breakeven: BreakevenOut
+    storage_breakeven_days: float | None = None
+    disclaimer: str | None = None

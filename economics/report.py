@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from economics.model import compare, load_params, order_economics, pvz_pnl, route_cost, storage_cost
+from economics.scenario import pvz_breakeven_ops, storage_breakeven_days
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "ECON_REPORT.md"
@@ -37,33 +38,6 @@ def party_rows(scenario: dict) -> str:
     )
 
 
-def pvz_breakeven_ops(params: dict) -> int:
-    fixed = float(params["pvz"]["fixed_cost_day_rub"])
-    cells = float(params["pvz"]["avg_cells_per_order"])
-    days = float(params["scenario_defaults"]["storage_days_typical"])
-    for ops in range(1, 500):
-        result = pvz_pnl(
-            params,
-            days=1,
-            ops=ops,
-            qty=ops,
-            storage_cell_days=ops * cells * days,
-            mesh_ops=int(round(ops * 0.3)),
-        )
-        if result["profit_rub"] >= 0:
-            return ops
-    return -1
-
-
-def storage_breakeven_days(params: dict, kind: str = "mesh", goods: float = 2500.0) -> float:
-    """Срок хранения, при котором прибыль маркетплейса по заказу обнуляется."""
-    cells = float(params["pvz"]["avg_cells_per_order"])
-    rate = float(params["pvz"]["storage_rate_day_rub"])
-    base = order_economics(params, kind=kind, goods_rub=goods, cells=cells, storage_days=0.0)
-    margin = base["marketplace"]["profit_rub"]
-    return round(margin / (rate * cells), 2)
-
-
 def build() -> str:
     params = load_params()
     goods = float(params["scenario_defaults"]["goods_price_rub"])
@@ -73,7 +47,7 @@ def build() -> str:
     mesh = order_economics(params, kind="mesh", goods_rub=goods, cells=cells, storage_days=storage_days)
     hub = order_economics(params, kind="hub", goods_rub=goods, cells=cells, storage_days=storage_days)
     cmp = compare(params, hub, mesh)
-    city_be = pvz_breakeven_ops(params)
+    city_be = pvz_breakeven_ops(params) or "> 2000"
     storage_be = storage_breakeven_days(params)
 
     low_load = pvz_pnl(params, days=1, ops=20, qty=20, storage_cell_days=20 * cells * storage_days, mesh_ops=6)

@@ -91,6 +91,7 @@ created → routed → assembled → in_transit → issued → returned
 | GET | `/analytics/pvz?pvz_id=&from=&to=` | доходы, удержания, прибыль с вычетом операционных и постоянных затрат, ячейко-дни, ledger ПВЗ |
 | GET | `/analytics/seller?seller_id=&from=&to=` | выручка, комиссия, прибыль, разрез по заказам |
 | GET | `/analytics/summary` | сводка: заказы по статусам, ledger по сторонам, логистика, инциденты |
+| GET | `/economics/scenario?mesh_bonus=&storage_rate=&fixed_cost=&commission_pct=&mesh_share=&ops=&goods=` | калькулятор «что если»: P&L четырёх сторон для mesh и хаба, точка безубыточности ПВЗ. Все параметры необязательны, вне диапазона — 422; считает `economics/scenario.py` поверх `params.yaml` |
 
 ## Пример: сквозной заказ
 

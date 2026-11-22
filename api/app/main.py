@@ -19,6 +19,7 @@ from .routers import (
     analytics,
     catalog,
     clock_api,
+    economics,
     incidents,
     notifications,
     orders,
@@ -123,7 +124,7 @@ def root():
     return RedirectResponse("/docs")
 
 
-for module in (catalog, orders, routes_api, incidents, returns, clock_api, analytics, notifications, track):
+for module in (catalog, orders, routes_api, incidents, returns, clock_api, analytics, notifications, track, economics):
     app.include_router(module.router, prefix="/api/v1")
 
 app.add_api_route("/api/v1/health", health, methods=["GET"], tags=["service"], response_model=HealthOut)

@@ -1963,6 +1963,152 @@
         }
       }
     },
+    "/api/v1/economics/scenario": {
+      "get": {
+        "tags": [
+          "economics"
+        ],
+        "summary": "Economics Scenario",
+        "description": "Пересчитывает экономику четырёх сторон при изменённых ставках.",
+        "operationId": "economics_scenario_api_v1_economics_scenario_get",
+        "parameters": [
+          {
+            "name": "mesh_bonus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "description": "Бонус ПВЗ за заказ без хаба, ₽",
+              "default": 15.0,
+              "title": "Mesh Bonus"
+            },
+            "description": "Бонус ПВЗ за заказ без хаба, ₽"
+          },
+          {
+            "name": "storage_rate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "description": "Тариф хранения, ₽/ячейка·день",
+              "default": 5.0,
+              "title": "Storage Rate"
+            },
+            "description": "Тариф хранения, ₽/ячейка·день"
+          },
+          {
+            "name": "fixed_cost",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 200000.0,
+              "minimum": 0.0,
+              "description": "Условно-постоянные затраты ПВЗ, ₽/день",
+              "default": 1200.0,
+              "title": "Fixed Cost"
+            },
+            "description": "Условно-постоянные затраты ПВЗ, ₽/день"
+          },
+          {
+            "name": "commission_pct",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 40.0,
+              "minimum": 0.0,
+              "description": "Комиссия маркетплейса, %",
+              "default": 12.0,
+              "title": "Commission Pct"
+            },
+            "description": "Комиссия маркетплейса, %"
+          },
+          {
+            "name": "goods",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 500000.0,
+              "minimum": 100.0,
+              "description": "Цена товара, ₽",
+              "default": 2500.0,
+              "title": "Goods"
+            },
+            "description": "Цена товара, ₽"
+          },
+          {
+            "name": "mesh_share",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "description": "Доля заказов без хаба для расчёта дня ПВЗ",
+              "default": 0.3,
+              "title": "Mesh Share"
+            },
+            "description": "Доля заказов без хаба для расчёта дня ПВЗ"
+          },
+          {
+            "name": "ops",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Операций ПВЗ в день для расчёта прибыли",
+              "default": 60,
+              "title": "Ops"
+            },
+            "description": "Операций ПВЗ в день для расчёта прибыли"
+          },
+          {
+            "name": "storage_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 90.0,
+              "minimum": 0.0,
+              "description": "Средний срок хранения, дней",
+              "default": 3.0,
+              "title": "Storage Days"
+            },
+            "description": "Средний срок хранения, дней"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health": {
       "get": {
         "tags": [
@@ -1987,6 +2133,95 @@
   },
   "components": {
     "schemas": {
+      "BreakevenOut": {
+        "properties": {
+          "ops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ops"
+          },
+          "share_of_capacity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Of Capacity"
+          },
+          "capacity_ops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity Ops"
+          }
+        },
+        "type": "object",
+        "title": "BreakevenOut"
+      },
+      "BuyerCostOut": {
+        "properties": {
+          "goods_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goods Rub"
+          },
+          "delivery_fee_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Fee Rub"
+          },
+          "total_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Rub"
+          },
+          "hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours"
+          }
+        },
+        "type": "object",
+        "title": "BuyerCostOut"
+      },
       "CheckOut": {
         "properties": {
           "name": {
@@ -2039,6 +2274,134 @@
           "virtual_now"
         ],
         "title": "ClockOut"
+      },
+      "CompareEconOut": {
+        "properties": {
+          "buyer_delta_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Delta Rub"
+          },
+          "buyer_delta_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Delta Pct"
+          },
+          "buyer_delta_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Delta Hours"
+          },
+          "buyer_acceptance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Acceptance"
+          },
+          "marketplace_profit_mesh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketplace Profit Mesh"
+          },
+          "marketplace_profit_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketplace Profit Base"
+          },
+          "pvz_profit_mesh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pvz Profit Mesh"
+          },
+          "pvz_profit_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pvz Profit Base"
+          },
+          "chain_profit_mesh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Profit Mesh"
+          },
+          "chain_profit_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Profit Base"
+          },
+          "viable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viable"
+          }
+        },
+        "type": "object",
+        "title": "CompareEconOut"
       },
       "CompareOut": {
         "properties": {
@@ -2651,6 +3014,74 @@
         ],
         "title": "LedgerRowOut"
       },
+      "MoneySideOut": {
+        "properties": {
+          "revenue": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue"
+          },
+          "revenue_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Total"
+          },
+          "costs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costs"
+          },
+          "costs_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costs Total"
+          },
+          "profit_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profit Rub"
+          }
+        },
+        "type": "object",
+        "title": "MoneySideOut",
+        "description": "Доходы/затраты одной стороны: доходы и затраты — положительные величины."
+      },
       "NotificationOut": {
         "properties": {
           "id": {
@@ -2761,6 +3192,101 @@
           "to_pvz_id"
         ],
         "title": "OrderCreate"
+      },
+      "OrderEconOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "storage": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage"
+          },
+          "buyer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BuyerCostOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pvz": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneySideOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "marketplace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneySideOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seller": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneySideOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chain": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "OrderEconOut"
       },
       "OrderOut": {
         "properties": {
@@ -2992,6 +3518,26 @@
           "status"
         ],
         "title": "OrderOut"
+      },
+      "OrderPairOut": {
+        "properties": {
+          "mesh": {
+            "$ref": "#/components/schemas/OrderEconOut"
+          },
+          "hub": {
+            "$ref": "#/components/schemas/OrderEconOut"
+          },
+          "compare": {
+            "$ref": "#/components/schemas/CompareEconOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mesh",
+          "hub",
+          "compare"
+        ],
+        "title": "OrderPairOut"
       },
       "PlannedRouteOut": {
         "properties": {
@@ -3234,6 +3780,102 @@
           "pvz"
         ],
         "title": "PvzAnalyticsOut"
+      },
+      "PvzDayOut": {
+        "properties": {
+          "revenue": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue"
+          },
+          "revenue_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Total"
+          },
+          "costs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costs"
+          },
+          "costs_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costs Total"
+          },
+          "profit_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profit Rub"
+          },
+          "ops": {
+            "type": "integer",
+            "title": "Ops"
+          },
+          "contribution_per_op_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution Per Op Rub"
+          },
+          "capacity_ops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity Ops"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ops"
+        ],
+        "title": "PvzDayOut"
       },
       "PvzOut": {
         "properties": {
@@ -3491,6 +4133,56 @@
           "id"
         ],
         "title": "RouteOut"
+      },
+      "ScenarioOut": {
+        "properties": {
+          "params": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Params"
+          },
+          "order": {
+            "$ref": "#/components/schemas/OrderPairOut"
+          },
+          "pvz_day": {
+            "$ref": "#/components/schemas/PvzDayOut"
+          },
+          "breakeven": {
+            "$ref": "#/components/schemas/BreakevenOut"
+          },
+          "storage_breakeven_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Breakeven Days"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "params",
+          "order",
+          "pvz_day",
+          "breakeven"
+        ],
+        "title": "ScenarioOut"
       },
       "SegmentOut": {
         "properties": {

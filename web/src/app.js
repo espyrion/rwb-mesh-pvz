@@ -16,6 +16,7 @@ const state = {
   buyerCode: "",
   buyerData: null,
   buyerError: null,
+  econ: { mesh_bonus: 15, storage_rate: 5, fixed_cost: 1200, commission_pct: 12, mesh_share: 30, ops: 60 },
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -548,9 +549,121 @@ async function renderBuyer() {
     </div>${card}`;
 }
 
+/* ---------- экономика ---------- */
+const ECON_FIELDS = [
+  { key: "mesh_bonus", label: "Бонус ПВЗ за заказ без хаба", min: 0, max: 50, step: 1, unit: "₽" },
+  { key: "storage_rate", label: "Тариф хранения", min: 0, max: 20, step: 0.5, unit: "₽/ячейка·день" },
+  { key: "fixed_cost", label: "Постоянные затраты точки", min: 0, max: 4000, step: 50, unit: "₽/день" },
+  { key: "commission_pct", label: "Комиссия маркетплейса", min: 0, max: 30, step: 0.5, unit: "%" },
+  { key: "mesh_share", label: "Доля заказов без хаба", min: 0, max: 100, step: 1, unit: "%" },
+  { key: "ops", label: "Операций ПВЗ в день", min: 10, max: 200, step: 1, unit: "шт" },
+];
+let econTimer = null;
+
+function econParams() {
+  return new URLSearchParams({
+    mesh_bonus: state.econ.mesh_bonus,
+    storage_rate: state.econ.storage_rate,
+    fixed_cost: state.econ.fixed_cost,
+    commission_pct: state.econ.commission_pct,
+    mesh_share: state.econ.mesh_share / 100,
+    ops: state.econ.ops,
+  });
+}
+
+function econRows(order) {
+  const profit = (side) => `<td class="num" style="color:${side >= 0 ? "var(--good)" : "var(--bad)"}">${money(side)}</td>`;
+  return [
+    `<tr><td>Покупатель платит</td><td class="num">${money(order.buyer.total_rub)}</td></tr>`,
+    `<tr><td>Срок</td><td class="num">${order.buyer.hours} ч</td></tr>`,
+    `<tr><td>Маркетплейс</td>${profit(order.marketplace.profit_rub)}</tr>`,
+    `<tr><td>ПВЗ</td>${profit(order.pvz.profit_rub)}</tr>`,
+    `<tr><td>Продавец</td>${profit(order.seller.profit_rub)}</tr>`,
+    `<tr><td><strong>Цепочка</strong></td>${profit(order.chain.profit_rub)}</tr>`,
+  ].join("");
+}
+
+function renderEconOut(data) {
+  const cmp = data.order.compare;
+  const day = data.pvz_day;
+  const be = data.breakeven;
+  const share = be.share_of_capacity === null ? null : Math.round(be.share_of_capacity * 100);
+  const ok = day.profit_rub >= 0;
+  $("#econ-out").innerHTML = `
+    <div class="card"><h2>Заказ без хаба</h2>
+      ${table([{ title: "Сторона" }, { title: "Итог", num: true }], [econRows(data.order.mesh)])}
+      <div class="hint">Логистика ${money(data.order.mesh.route.cost_rub)}, хранение ${money(data.order.mesh.storage.cost_rub)}</div>
+    </div>
+    <div class="card"><h2>Заказ через хаб</h2>
+      ${table([{ title: "Сторона" }, { title: "Итог", num: true }], [econRows(data.order.hub)])}
+      <div class="hint">Логистика ${money(data.order.hub.route.cost_rub)}, хранение ${money(data.order.hub.storage.cost_rub)}</div>
+    </div>
+    <div class="card"><h2>Разница</h2>
+      <div class="metric good">${money(-cmp.buyer_delta_rub)}</div>
+      <div class="hint">экономия покупателя${cmp.buyer_delta_hours < 0 ? `, доставка на ${num(Math.abs(cmp.buyer_delta_hours))} ч быстрее` : ""}</div>
+      <table class="mt">
+        <tr><td>Маркетплейс</td><td class="num" style="color:${cmp.marketplace_profit_mesh >= cmp.marketplace_profit_base ? "var(--good)" : "var(--bad)"}">${money(cmp.marketplace_profit_mesh - cmp.marketplace_profit_base)}</td></tr>
+        <tr><td>ПВЗ</td><td class="num" style="color:${cmp.pvz_profit_mesh >= 0 ? "var(--good)" : "var(--bad)"}">${money(cmp.pvz_profit_mesh)}</td></tr>
+        <tr><td>Цепочка</td><td class="num">${money(cmp.chain_profit_mesh - cmp.chain_profit_base)}</td></tr>
+      </table>
+    </div>
+    <div class="card" style="grid-column:1/-1"><h2>ПВЗ при ${num(day.ops)} операциях в день</h2>
+      <div class="grid cols-2">
+        <div>
+          <div class="metric ${ok ? "good" : "bad"}">${money(day.profit_rub)}</div>
+          <div class="hint">${money(day.contribution_per_op_rub)} с операции · ${money(day.costs.fixed)} постоянных затрат</div>
+          <div class="bar ${ok ? "" : "warn"} mt"><span style="width:${Math.min(100, Math.round((day.ops / day.capacity_ops) * 100))}%"></span></div>
+          <div class="hint">Загрузка точки ${Math.round((day.ops / day.capacity_ops) * 100)}% от ${num(day.capacity_ops)} операций</div>
+        </div>
+        <div>
+          <p>Точка выходит в ноль при <strong>${be.ops === null ? "&gt; 2000" : num(be.ops)}</strong> операциях в день${share === null ? "" : ` — ${share}% мощности`}.</p>
+          <div class="hint">Безубыточность — при заданном бонусе и доле заказов без хаба. Порог хранения ${String(data.storage_breakeven_days).replace(".", ",")} дн: дольше — маркетплейс на заказе теряет.</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function refreshEcon() {
+  const data = await api("/economics/scenario?" + econParams().toString());
+  renderEconOut(data);
+}
+
+async function renderEconomics() {
+  const rows = ECON_FIELDS.map((field) => `
+    <div class="econ-row">
+      <label for="econ-${field.key}">${esc(field.label)}</label>
+      <output id="econ-${field.key}-out">${state.econ[field.key]} ${esc(field.unit)}</output>
+      <input id="econ-${field.key}" data-econ="${field.key}" data-unit="${esc(field.unit)}" type="range"
+             min="${field.min}" max="${field.max}" step="${field.step}" value="${state.econ[field.key]}" />
+    </div>`).join("");
+  $("#page").innerHTML = `
+    <div class="card">
+      <h2>Что если</h2>
+      <form id="econ-form" class="grid cols-3" onsubmit="return false">${rows}</form>
+      <div class="hint">Ставки — параметры модели (<span class="mono">economics/params.yaml</span>), а не тарифы RWB.
+      Считает тот же модуль, что и <span class="mono">docs/ECON_REPORT.md</span>: цифры на слайде и здесь не расходятся.</div>
+    </div>
+    <div id="econ-out" class="grid cols-2"></div>`;
+  await refreshEcon();
+}
+
+document.addEventListener("input", (event) => {
+  const input = event.target.closest("[data-econ]");
+  if (!input) return;
+  const key = input.dataset.econ;
+  state.econ[key] = Number(input.value);
+  const out = $(`#econ-${key}-out`);
+  if (out) out.textContent = `${input.value} ${input.dataset.unit}`;
+  clearTimeout(econTimer);
+  econTimer = setTimeout(() => {
+    guard(refreshEcon());
+  }, 180);
+});
+
 /* ---------- роутинг ---------- */
 const pages = {
   dashboard: { title: "Дашборд", subtitle: "Сводка по сети ПВЗ и денежным потокам", render: renderDashboard },
+  economics: { title: "Экономика", subtitle: "Что если: ставки, прибыль четырёх сторон, порог безубыточности", render: renderEconomics },
   pvz: { title: "Кабинет ПВЗ", subtitle: "Приёмка, остатки, хранение и доходы точки", render: renderPvz },
   seller: { title: "Кабинет продавца", subtitle: "Остатки, заказы и расчёты продавца", render: renderSeller },
   orders: { title: "Заказы", subtitle: "Маршрут, сборка, выдача, возврат", render: renderOrders },
