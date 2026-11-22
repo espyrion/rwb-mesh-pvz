@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Прогон пяти демо-сценариев против запущенного API (backup-видео / проверка на стенде).
+"""Прогон шести демо-сценариев против запущенного API (backup-видео / проверка на стенде).
 
 Запуск:
     python3 scripts/demo.py                    # http://localhost:8000
@@ -18,12 +18,14 @@ import urllib.error
 import urllib.request
 
 API = os.environ.get("API_URL", "http://localhost:8000").rstrip("/") + "/api/v1"
+API_KEY = os.environ.get("MESH_API_KEY", "demo-admin-key")
 ROOT = API[: -len("/api/v1")]
 
 
 def call(path: str, method: str = "GET", body: dict | None = None):
     data = json.dumps(body).encode() if body is not None else None
     request = urllib.request.Request(API + path, data=data, method=method)
+    request.add_header("X-API-Key", API_KEY)
     if data is not None:
         request.add_header("Content-Type", "application/json")
     try:
@@ -178,6 +180,21 @@ def main() -> int:
               f"{money(moved['relocation']['cost_rub'])} на маркетплейс")
     else:
         print("  Свободных остатков для предложения нет (всё зарезервировано под заказы)")
+
+    # 6. Отмена до выдачи и публичное отслеживание
+    title("СЦЕНАРИЙ 6. Отмена заказа и отслеживание покупателем")
+    item = ensure_item()
+    dst = destination(item["stored_pvz_code"])
+    created = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": dst["id"]})
+    order = created["order"]
+    print(f"  Заказ {order['code']}: {order['from_code']} → {order['to_code']}, "
+          f"{money(order['buyer_total_rub'])}, схема {order['route']['kind']}")
+    track = call(f"/track/{order['code']}")
+    print(f"  Покупатель видит: «{track['status_label']}», событий в истории: {len(track['timeline'])}")
+    cancelled = call(f"/orders/{order['id']}/cancel", "POST")["order"]
+    print(f"  Отмена до выдачи: {cancelled['status']}, резерв снят, остаток вернулся в ячейки")
+    after = call(f"/track/{order['code']}")
+    print(f"  Покупатель видит: «{after['status_label']}», история дополнена")
 
     title("ГОТОВО")
     summary = call("/analytics/summary")

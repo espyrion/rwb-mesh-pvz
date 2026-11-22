@@ -36,12 +36,13 @@ ORDER_STATUSES = (
 # Разрешённый граф переходов заказа. Проверяется тестами и API.
 ORDER_TRANSITIONS = {
     "created": {"routed"},
-    "routed": {"assembled", "rerouted"},
-    "rerouted": {"assembled", "rerouted"},
-    "assembled": {"in_transit", "issued"},
+    "routed": {"assembled", "rerouted", "cancelled"},
+    "rerouted": {"assembled", "rerouted", "cancelled"},
+    "assembled": {"in_transit", "issued", "cancelled"},
     "in_transit": {"issued"},
     "issued": {"returned"},
     "returned": set(),
+    "cancelled": set(),
 }
 
 ROUTE_KINDS = ("mesh", "hub")
@@ -153,6 +154,7 @@ class Order(Base):
     created_at = Column(DateTime, nullable=False)
     assembled_at = Column(DateTime, nullable=True)
     issued_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
     return_deadline = Column(DateTime, nullable=True)
     buyer_total_rub = Column(Float, nullable=False, default=0.0)
     seller_net_rub = Column(Float, nullable=False, default=0.0)

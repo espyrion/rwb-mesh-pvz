@@ -31,7 +31,11 @@ def params_path() -> Path:
 @lru_cache(maxsize=1)
 def params() -> dict:
     with open(params_path(), encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+        data = yaml.safe_load(fh)
+    # Опечатка в ключе или отрицательный тариф должны падать на старте, а не в отчёте.
+    from .params_schema import validate
+
+    return validate(data).model_dump()
 
 
 def reload_params() -> dict:

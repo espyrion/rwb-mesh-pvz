@@ -13,6 +13,9 @@ const state = {
   page: "dashboard",
   ledgerOrderId: null,
   compare: null,
+  buyerCode: "",
+  buyerData: null,
+  buyerError: null,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -25,8 +28,14 @@ const money = (value) =>
 const num = (value) => new Intl.NumberFormat("ru-RU").format(value ?? 0);
 const dt = (iso) => (iso ? new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 
+const ROLE_KEYS = { admin: "demo-admin-key", seller: "demo-seller-key", pvz: "demo-pvz-key" };
+
+function apiKey() {
+  return ROLE_KEYS[localStorage.getItem("meshRole") || "admin"] || ROLE_KEYS.admin;
+}
+
 async function api(path, options = {}) {
-  const init = { method: options.method || "GET", headers: {} };
+  const init = { method: options.method || "GET", headers: { "X-API-Key": apiKey() } };
   if (options.body !== undefined) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(options.body);
@@ -70,7 +79,7 @@ function pill(status) {
   const map = {
     stored: "Хранится", reserved: "Зарезервирован", assembled: "Собран", issued: "Выдан",
     returned: "Возвращён", created: "Создан", routed: "Маршрут", rerouted: "Перемаршрутизирован",
-    in_transit: "В пути", open: "Открыт", resolved: "Решён",
+    in_transit: "В пути", open: "Открыт", resolved: "Решён", cancelled: "Отменён",
   };
   return `<span class="pill ${esc(status)}">${esc(map[status] || status)}</span>`;
 }
@@ -351,6 +360,7 @@ async function renderOrders() {
     if (order.status === "assembled") actions.push(`<button class="btn ghost small" data-action="transit" data-id="${order.id}">В путь</button>`);
     if (order.status === "assembled" || order.status === "in_transit") actions.push(`<button class="btn good small" data-action="issue" data-id="${order.id}">Выдать</button>`);
     if (order.status === "issued") actions.push(`<button class="btn danger small" data-action="return" data-id="${order.id}">Возврат</button>`);
+    if (["routed", "rerouted", "assembled"].includes(order.status)) actions.push(`<button class="btn danger small" data-action="cancel" data-id="${order.id}">Отменить</button>`);
     actions.push(`<button class="btn ghost small" data-action="ledger" data-id="${order.id}">Начисления</button>`);
     return `<tr>
       <td><strong>${esc(order.code)}</strong><br><span class="muted small">${esc(order.title || "")} × ${order.qty}</span></td>
@@ -503,12 +513,47 @@ async function renderClock() {
   });
 }
 
+async function renderBuyer() {
+  let card = "";
+  if (state.buyerError) {
+    card = `<div class="card"><h2>Заказ не найден</h2><p>${esc(state.buyerError)}</p></div>`;
+  }
+  const data = state.buyerData;
+  if (data) {
+    const timeline = (data.timeline || [])
+      .map((event) => `<li><strong>${esc(event.label)}</strong><br><span class="muted small">${dt(event.ts)}</span></li>`)
+      .join("");
+    card = `<div class="card">
+      <div class="section-title"><h2>${esc(data.code)}</h2>${pill(data.status)}</div>
+      <p>${esc(data.hint)}</p>
+      <div class="grid cols-4">
+        <div><span class="muted small">Куда</span><br><strong>${esc(data.destination.code || "—")}</strong> · ${esc(data.destination.city || "")}</div>
+        <div><span class="muted small">Схема</span><br>${data.route ? esc(kindLabel[data.route.kind] || data.route.kind) : "—"}</div>
+        <div><span class="muted small">К оплате</span><br><strong>${money(data.buyer_total_rub)}</strong></div>
+        <div><span class="muted small">Возврат до</span><br>${data.return_deadline ? dt(data.return_deadline) : "после выдачи"}</div>
+      </div>
+      <h3>История</h3>
+      <ul class="timeline">${timeline || "<li class=\"muted\">Событий пока нет</li>"}</ul>
+    </div>`;
+  }
+  $("#page").innerHTML = `
+    <div class="card"><h2>Отслеживание заказа</h2>
+      <div class="inline">
+        <label style="min-width:220px">Код заказа<input id="track-code" placeholder="ORD-00001" value="${esc(state.buyerCode)}"></label>
+        <button class="btn" data-action="track">Показать</button>
+      </div>
+      <div class="hint">Страница покупателя публичная: код, статус, сроки и стоимость доставки. Комиссии
+      маркетплейса и расчёты продавца здесь не показываются.</div>
+    </div>${card}`;
+}
+
 /* ---------- роутинг ---------- */
 const pages = {
   dashboard: { title: "Дашборд", subtitle: "Сводка по сети ПВЗ и денежным потокам", render: renderDashboard },
   pvz: { title: "Кабинет ПВЗ", subtitle: "Приёмка, остатки, хранение и доходы точки", render: renderPvz },
   seller: { title: "Кабинет продавца", subtitle: "Остатки, заказы и расчёты продавца", render: renderSeller },
   orders: { title: "Заказы", subtitle: "Маршрут, сборка, выдача, возврат", render: renderOrders },
+  buyer: { title: "Покупатель", subtitle: "Отслеживание заказа по коду без входа в систему", render: renderBuyer },
   routes: { title: "Маршруты и сеть", subtitle: "mesh против хаба и управление сегментами", render: renderRoutes },
   incidents: { title: "Инциденты", subtitle: "Нештатные ситуации и перевыбор маршрута", render: renderIncidents },
   clock: { title: "Время и уведомления", subtitle: "Виртуальные часы, начисления, лента событий", render: renderClock },
@@ -544,6 +589,19 @@ document.addEventListener("click", async (event) => {
   if (action === "transit") result = await guard(api(`/orders/${id}/transit`, { method: "POST" }), "Заказ в пути");
   if (action === "issue") result = await guard(api(`/orders/${id}/issue`, { method: "POST" }), "Заказ выдан, начисления сформированы");
   if (action === "return") result = await guard(api(`/orders/${id}/return`, { method: "POST" }), "Возврат оформлен");
+  if (action === "cancel") result = await guard(api(`/orders/${id}/cancel`, { method: "POST" }), "Заказ отменён");
+  if (action === "track") {
+    state.buyerCode = ($("#track-code")?.value || "").trim().toUpperCase();
+    state.buyerData = null;
+    state.buyerError = null;
+    try {
+      state.buyerData = await api(`/track/${encodeURIComponent(state.buyerCode)}`);
+    } catch (error) {
+      state.buyerError = error.message;
+    }
+    render();
+    return;
+  }
   if (action === "ledger") {
     state.ledgerOrderId = state.ledgerOrderId === id ? null : id;
     render();
@@ -578,4 +636,13 @@ document.addEventListener("click", async (event) => {
 });
 
 $("#refresh").addEventListener("click", render);
+
+const roleSelect = $("#role-select");
+if (roleSelect) {
+  roleSelect.value = localStorage.getItem("meshRole") || "admin";
+  roleSelect.addEventListener("change", () => {
+    localStorage.setItem("meshRole", roleSelect.value);
+    location.reload();
+  });
+}
 render();

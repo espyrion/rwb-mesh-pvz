@@ -188,6 +188,61 @@ def transit_order(order_id: int, db: Session = Depends(get_db)):
     return {"order": order_dict(db, order)}
 
 
+@router.post("/orders/{order_id}/cancel")
+def cancel_order(order_id: int, db: Session = Depends(get_db)):
+    """Отмена до выдачи: освобождает резерв и возвращает остаток на ПВЗ-источник."""
+    order = db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(404, "order not found")
+    if order.status == "cancelled":
+        return {"order": order_dict(db, order), "idempotent_replay": True}
+    if order.status in ("in_transit", "issued", "returned"):
+        raise HTTPException(409, f"нельзя отменить заказ в статусе {order.status}")
+    _transition(order, "cancelled")
+
+    item = db.get(Item, order.item_id)
+    src = db.get(Pvz, order.from_pvz)
+    dst = db.get(Pvz, order.to_pvz)
+    cells = item.cell_size * order.qty
+    if order.status == "assembled":
+        # Заказ уже перевезён на пункт выдачи: возвращаем товар и ячейки обратно.
+        try:
+            storage.occupy(src, cells)
+        except storage.CapacityError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        storage.release(dst, cells)
+        item.stored_pvz_id = src.id
+
+    active = (
+        db.query(Order)
+        .filter(
+            Order.item_id == order.item_id,
+            Order.id != order.id,
+            Order.status.in_(("routed", "rerouted", "assembled", "in_transit")),
+        )
+        .count()
+    )
+    item.status = "reserved" if active else "stored"
+    order.status = "cancelled"
+    order.cancelled_at = now(db)
+    notify(
+        db,
+        "pvz",
+        f"Заказ {order.code} отменён. Остаток {order.qty} шт. остаётся на {src.code}, ячейки освобождены.",
+        order_id=order.id,
+        payload={"kind": "cancelled", "pvz_id": src.id, "cells": cells},
+    )
+    notify(
+        db,
+        "seller",
+        f"Заказ {order.code} отменён покупателем. Товар {item.title} возвращён в остатки.",
+        order_id=order.id,
+        payload={"kind": "cancelled"},
+    )
+    db.commit()
+    return {"order": order_dict(db, order)}
+
+
 @router.post("/orders/{order_id}/issue")
 def issue_order(order_id: int, db: Session = Depends(get_db)):
     order = db.get(Order, order_id)

@@ -20,12 +20,20 @@
       <button class="nav-item" data-page="pvz">Кабинет ПВЗ</button>
       <button class="nav-item" data-page="seller">Кабинет продавца</button>
       <button class="nav-item" data-page="orders">Заказы</button>
+      <button class="nav-item" data-page="buyer">Покупатель</button>
       <button class="nav-item" data-page="routes">Маршруты</button>
       <button class="nav-item" data-page="incidents">Инциденты</button>
       <button class="nav-item" data-page="clock">Время и уведомления</button>
     </nav>
     <div class="sidebar-footer">
       <div id="clock-badge" class="badge">—</div>
+      <label class="muted small" style="display:block;margin-bottom:8px">Роль API
+        <select id="role-select">
+          <option value="admin">Маркетплейс</option>
+          <option value="seller">Продавец</option>
+          <option value="pvz">ПВЗ</option>
+        </select>
+      </label>
       <p class="muted small">Хаб, магистраль и платёжный шлюз — имитация. Денежные расчёты программные, реальные платежи не проводятся.</p>
     </div>
   </aside>

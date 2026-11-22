@@ -9,6 +9,9 @@ services:
       ECON_PARAMS: /app/economics/params.yaml
       PYTHONPATH: /app
       TZ: Europe/Moscow
+      MESH_PVZ_KEY: ${MESH_PVZ_KEY:-demo-pvz-key}
+      MESH_SELLER_KEY: ${MESH_SELLER_KEY:-demo-seller-key}
+      MESH_ADMIN_KEY: ${MESH_ADMIN_KEY:-demo-admin-key}
     volumes:
       - ./api:/app
       - ./economics:/app/economics

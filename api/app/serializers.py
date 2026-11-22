@@ -100,6 +100,7 @@ def order_dict(session: Session, order: Order) -> dict:
         "created_at": iso(order.created_at),
         "assembled_at": iso(order.assembled_at),
         "issued_at": iso(order.issued_at),
+        "cancelled_at": iso(order.cancelled_at),
         "return_deadline": iso(order.return_deadline),
         "buyer_total_rub": order.buyer_total_rub,
         "seller_net_rub": order.seller_net_rub,

@@ -14,6 +14,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.db import SessionLocal, init_db  # noqa: E402
+from app.auth import key_for  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed import seed  # noqa: E402
 
@@ -24,6 +25,8 @@ def client():
     with SessionLocal() as session:
         seed(session)
     with TestClient(app) as test_client:
+        # Тесты ходят от имени маркетплейса; роли проверяются отдельно в test_auth.py.
+        test_client.headers.update({"X-API-Key": key_for("admin")})
         yield test_client
 
 

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 from .db import init_db
+from .auth import ApiKeyMiddleware
 from .routers import (
     analytics,
     catalog,
@@ -20,6 +21,7 @@ from .routers import (
     orders,
     returns,
     routes_api,
+    track,
 )
 
 
@@ -46,6 +48,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(ApiKeyMiddleware)
 
 
 @app.get("/health", tags=["service"])
@@ -58,7 +61,7 @@ def root():
     return RedirectResponse("/docs")
 
 
-for module in (catalog, orders, routes_api, incidents, returns, clock_api, analytics, notifications):
+for module in (catalog, orders, routes_api, incidents, returns, clock_api, analytics, notifications, track):
     app.include_router(module.router, prefix="/api/v1")
 
 app.add_api_route("/api/v1/health", health, methods=["GET"], tags=["service"])
