@@ -210,7 +210,7 @@ async function renderPvz() {
       <div class="grid cols-4" style="margin-top:12px">
         <div><h3>Ёмкость</h3><div class="metric small">${pvz.used_cells} / ${pvz.capacity_cells}</div><div class="hint">свободно ${pvz.free_cells} ячеек</div></div>
         <div><h3>Загрузка</h3><div class="metric small">${pvz.utilization_pct}%</div><div class="bar ${pvz.utilization_pct >= 85 ? "warn" : ""}"><span style="width:${Math.min(100, pvz.utilization_pct)}%"></span></div></div>
-        <div><h3>Прибыль за период</h3><div class="metric small ${analytics.profit_rub >= 0 ? "good" : "bad"}">${money(analytics.profit_rub)}</div><div class="hint">ledger ${money(analytics.ledger_net_rub)} − операции ${money(analytics.op_costs_modeled_rub)}</div></div>
+        <div><h3>Прибыль за период</h3><div class="metric small ${analytics.profit_rub >= 0 ? "good" : "bad"}">${money(analytics.profit_rub)}</div><div class="hint">ledger ${money(analytics.ledger_net_rub)} − операции ${money(analytics.op_costs_modeled_rub)} − постоянные ${money(analytics.fixed_costs_modeled_rub)}</div></div>
         <div><h3>Хранение</h3><div class="metric small">${money(analytics.revenue.storage || 0)}</div><div class="hint">${analytics.storage_cell_days} ячейко-дней</div></div>
       </div>
       <div class="hint">${esc(pvz.code)} · ${esc(pvz.name)} · ${esc(pvz.city)} · тариф ${money(pvz.storage_rate_day)}/ячейка·день, выдача ${money(pvz.op_fee)}</div>
@@ -554,7 +554,7 @@ const pages = {
   pvz: { title: "Кабинет ПВЗ", subtitle: "Приёмка, остатки, хранение и доходы точки", render: renderPvz },
   seller: { title: "Кабинет продавца", subtitle: "Остатки, заказы и расчёты продавца", render: renderSeller },
   orders: { title: "Заказы", subtitle: "Маршрут, сборка, выдача, возврат", render: renderOrders },
-  buyer: { title: "Покупатель", subtitle: "Отслеживание заказа по коду без входа в систему", render: renderBuyer },
+  buyer: { title: "Покупатель", subtitle: "Отслеживание заказа по ссылке без входа в систему", render: renderBuyer },
   routes: { title: "Маршруты и сеть", subtitle: "mesh против хаба и управление сегментами", render: renderRoutes },
   incidents: { title: "Инциденты", subtitle: "Нештатные ситуации и перевыбор маршрута", render: renderIncidents },
   clock: { title: "Время и уведомления", subtitle: "Виртуальные часы, начисления, лента событий", render: renderClock },

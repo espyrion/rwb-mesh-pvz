@@ -26,6 +26,14 @@ def test_track_token_is_case_insensitive(client):
     assert client.get(f"/api/v1/track/{token.upper()}").status_code == 200
 
 
+def test_public_card_has_route_kind_for_buyer(client):
+    order = create_order(client)["order"]
+    card = client.get(track_url(order)).json()
+    assert card["route"]["kind"] == "mesh"
+    assert card["route"]["hours"] > 0
+    assert card["destination"]["code"] == order["to_code"]
+
+
 def test_track_hides_internal_money(client):
     data = client.get(track_url(create_order(client)["order"])).json()
     for forbidden in ("seller_net_rub", "item_id", "route_id", "id", "commission_rub"):

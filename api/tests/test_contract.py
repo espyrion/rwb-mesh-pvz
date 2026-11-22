@@ -60,6 +60,15 @@ def test_deep_health_reports_invariants(client):
     assert data["counts"]["pvz"] == 9  # 8 ПВЗ + хаб
 
 
+def test_routes_compare_keeps_from_and_to_refs(client):
+    """UI строит селекторы по compare.from.id / compare.to.id — схема не должна их терять."""
+    data = client.get("/api/v1/routes/compare", params={"from": 1, "to": 3}).json()
+    assert data["from"]["id"] == 1 and data["from"]["code"] == "YOL-01"
+    assert data["to"]["id"] == 3
+    assert data["mesh"]["kind"] == "mesh" and data["chosen"] in {"mesh", "hub"}
+    assert data["mesh"]["total_cost_rub"] > 0
+
+
 def test_openapi_declares_response_schemas_and_api_key(client):
     schema = client.get("/openapi.json").json()
     schemes = schema["components"]["securitySchemes"]

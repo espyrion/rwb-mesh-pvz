@@ -2084,27 +2084,25 @@
             ],
             "title": "Reason"
           },
-          "from_pvz": {
+          "from": {
             "anyOf": [
               {
-                "type": "integer"
+                "$ref": "#/components/schemas/PvzRefOut"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "From Pvz"
+            ]
           },
-          "to_pvz": {
+          "to": {
             "anyOf": [
               {
-                "type": "integer"
+                "$ref": "#/components/schemas/PvzRefOut"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "To Pvz"
+            ]
           }
         },
         "type": "object",
@@ -3341,6 +3339,41 @@
         ],
         "title": "PvzOut"
       },
+      "PvzRefOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "PvzRefOut"
+      },
       "RelocateRequest": {
         "properties": {
           "to_pvz_id": {
@@ -4020,6 +4053,16 @@
               }
             ],
             "title": "Timeline"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrackRouteOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4067,6 +4110,34 @@
         },
         "type": "object",
         "title": "TrackPartyOut"
+      },
+      "TrackRouteOut": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours"
+          }
+        },
+        "type": "object",
+        "title": "TrackRouteOut"
       },
       "ValidationError": {
         "properties": {

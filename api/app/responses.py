@@ -123,13 +123,21 @@ class PlannedRouteOut(Out):
     reason: str | None = None
 
 
+class PvzRefOut(Out):
+    id: int
+    code: str | None = None
+    city: str | None = None
+
+
 class CompareOut(Out):
     mesh: PlannedRouteOut | None = None
     hub: PlannedRouteOut | None = None
     chosen: str | None = None
     reason: str | None = None
-    from_pvz: int | None = None
-    to_pvz: int | None = None
+    # routing.compare() отдаёт вложенные объекты «from»/«to»; имена с подчёркиванием —
+    # потому что from — ключевое слово, наружу уходит псевдоним.
+    from_: PvzRefOut | None = Field(default=None, alias="from")
+    to_: PvzRefOut | None = Field(default=None, alias="to")
 
 
 class IncidentOut(Out):
@@ -189,6 +197,11 @@ class TrackPartyOut(Out):
     name: str | None = None
 
 
+class TrackRouteOut(Out):
+    kind: str | None = None
+    hours: float | None = None
+
+
 class TrackOut(Out):
     code: str
     status: str
@@ -204,6 +217,7 @@ class TrackOut(Out):
     destination: TrackPartyOut | None = None
     hint: str | None = None
     timeline: list[TrackEventOut] | None = None
+    route: TrackRouteOut | None = None
 
 
 class PvzAnalyticsOut(Out):
