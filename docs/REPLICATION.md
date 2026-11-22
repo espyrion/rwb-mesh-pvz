@@ -111,7 +111,7 @@ stateless-процессы за nginx, БД с репликой.
 
 * структурные логи JSON: `ts`, `request_id`, `method`, `path`, `status`, `duration_ms`, `party`;
 * audit-log действий: приёмка, выдача, возврат, перемещение, отключение сегмента;
-* healthcheck `/health`, метрики (планируется Prometheus): RPS, p95, ошибки 4xx/5xx, число открытых
+* healthcheck `/health` и проверка инвариантов `/api/v1/health/deep`, метрики (планируется Prometheus): RPS, p95, ошибки 4xx/5xx, число открытых
   инцидентов, загрузка ПВЗ.
 
 ### Повторные запросы и целостность

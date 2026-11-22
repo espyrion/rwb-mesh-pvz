@@ -6,16 +6,17 @@ from sqlalchemy.orm import Session
 
 from .. import clock, storage
 from ..db import get_db
+from ..responses import ClockOut, StorageAccrualOut
 
 router = APIRouter(tags=["clock"])
 
 
-@router.get("/clock")
+@router.get("/clock", response_model=ClockOut)
 def get_clock(db: Session = Depends(get_db)):
     return {"virtual_now": clock.now(db).isoformat(), "timezone": "Europe/Moscow (virtual)"}
 
 
-@router.post("/clock/advance")
+@router.post("/clock/advance", response_model=StorageAccrualOut)
 def advance_clock(
     days: int = Query(default=1, ge=0, le=365, description="Сдвиг виртуального времени, дней"),
     db: Session = Depends(get_db),

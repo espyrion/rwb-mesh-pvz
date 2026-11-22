@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from .. import clock
 from ..config import p
 from ..db import get_db
+from ..responses import PvzAnalyticsOut, SellerAnalyticsOut, SummaryOut
 from ..models import Incident, Item, Ledger, Order, Pvz, Route, Seller
 from ..serializers import pvz_dict, seller_dict
 from ..storage import utilization
@@ -28,7 +29,7 @@ def _period(q, column, date_from: str | None, date_to: str | None):
     return q
 
 
-@router.get("/analytics/pvz")
+@router.get("/analytics/pvz", response_model=PvzAnalyticsOut)
 def analytics_pvz(
     pvz_id: int,
     date_from: str | None = Query(default=None, alias="from"),
@@ -97,7 +98,7 @@ def analytics_pvz(
     }
 
 
-@router.get("/analytics/seller")
+@router.get("/analytics/seller", response_model=SellerAnalyticsOut)
 def analytics_seller(
     seller_id: int,
     date_from: str | None = Query(default=None, alias="from"),
@@ -149,7 +150,7 @@ def analytics_seller(
     }
 
 
-@router.get("/analytics/summary")
+@router.get("/analytics/summary", response_model=SummaryOut)
 def analytics_summary(db: Session = Depends(get_db)):
     rows = db.query(Ledger).all()
     by_party: dict[str, float] = defaultdict(float)

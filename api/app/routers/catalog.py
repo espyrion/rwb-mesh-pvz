@@ -1,7 +1,7 @@
 """ПВЗ, товары, продавцы, приёмка и перемещение остатков."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from .. import storage
@@ -9,13 +9,15 @@ from ..clock import now
 from ..db import get_db
 from ..models import Item, Pvz, Seller
 from ..notify import notify
+from ..paging import page
+from ..responses import ItemOut, LedgerRowOut, PvzOut, SellerOut
 from ..schemas import ItemCreate, RelocateRequest
 from ..serializers import item_dict, pvz_dict, seller_dict
 
 router = APIRouter(tags=["catalog"])
 
 
-@router.get("/pvz")
+@router.get("/pvz", response_model=list[PvzOut])
 def list_pvz(
     city: str | None = None,
     include_hub: bool = True,
@@ -29,7 +31,7 @@ def list_pvz(
     return [pvz_dict(row) for row in q.all()]
 
 
-@router.get("/pvz/{pvz_id}")
+@router.get("/pvz/{pvz_id}", response_model=PvzOut)
 def get_pvz(pvz_id: int, db: Session = Depends(get_db)):
     row = db.get(Pvz, pvz_id)
     if row is None:
@@ -58,12 +60,12 @@ def enable_pvz(pvz_id: int, db: Session = Depends(get_db)):
     return {"pvz": pvz_dict(row)}
 
 
-@router.get("/sellers")
+@router.get("/sellers", response_model=list[SellerOut])
 def list_sellers(db: Session = Depends(get_db)):
     return [seller_dict(s) for s in db.query(Seller).order_by(Seller.id).all()]
 
 
-@router.get("/sellers/{seller_id}")
+@router.get("/sellers/{seller_id}", response_model=SellerOut)
 def get_seller(seller_id: int, db: Session = Depends(get_db)):
     row = db.get(Seller, seller_id)
     if row is None:
@@ -115,11 +117,14 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     return item_dict(db, item)
 
 
-@router.get("/items")
+@router.get("/items", response_model=list[ItemOut])
 def list_items(
+    response: Response,
     pvz_id: int | None = None,
     status: str | None = None,
     seller_id: int | None = None,
+    limit: int | None = Query(default=None, ge=1, le=500, description="Сколько вернуть; без него — все"),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     q = db.query(Item).order_by(Item.id)
@@ -129,10 +134,10 @@ def list_items(
         q = q.filter(Item.status == status)
     if seller_id is not None:
         q = q.filter(Item.seller_id == seller_id)
-    return [item_dict(db, row) for row in q.all()]
+    return [item_dict(db, row) for row in page(q, response, limit, offset)]
 
 
-@router.get("/items/{item_id}")
+@router.get("/items/{item_id}", response_model=ItemOut)
 def get_item(item_id: int, db: Session = Depends(get_db)):
     row = db.get(Item, item_id)
     if row is None:
@@ -157,11 +162,15 @@ def relocate_item(item_id: int, payload: RelocateRequest, db: Session = Depends(
     return {"relocation": result, "item": item_dict(db, item)}
 
 
-@router.get("/ledger")
+@router.get("/ledger", response_model=list[LedgerRowOut])
 def list_ledger(
+    response: Response,
     order_id: int | None = None,
     viewer: str | None = Query(default=None, description="pvz | seller | marketplace | buyer"),
     party_id: int | None = None,
+    kind: str | None = Query(default=None, description="Вид начисления: delivery, storage, commission…"),
+    limit: int | None = Query(default=None, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     from ..models import Ledger
@@ -174,4 +183,6 @@ def list_ledger(
         q = q.filter(Ledger.party == viewer)
     if party_id is not None:
         q = q.filter(Ledger.party_id == party_id)
-    return [ledger_dict(row) for row in q.all()]
+    if kind:
+        q = q.filter(Ledger.kind == kind)
+    return [ledger_dict(row) for row in page(q, response, limit, offset)]

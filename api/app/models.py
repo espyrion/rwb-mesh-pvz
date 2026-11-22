@@ -160,6 +160,8 @@ class Order(Base):
     seller_net_rub = Column(Float, nullable=False, default=0.0)
     return_route_id = Column(Integer, ForeignKey("route.id"), nullable=True)
     idempotency_key = Column(String(64), unique=True, nullable=True, index=True)
+    # Публичный токен для ссылки покупателя: код заказа последовательный и легко перебирается.
+    public_token = Column(String(24), unique=True, nullable=True, index=True)
 
 
 class Ledger(Base):

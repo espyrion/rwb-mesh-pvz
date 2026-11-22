@@ -12,6 +12,7 @@ from ..db import get_db
 from ..models import Edge, Incident, Order, Pvz, Route
 from ..notify import notify
 from ..schemas import RerouteRequest
+from ..responses import IncidentOut
 from ..serializers import incident_dict, order_dict, route_dict
 
 router = APIRouter(tags=["incidents"])
@@ -144,7 +145,7 @@ def incidents_for_node(session: Session, pvz_id: int, reason: str) -> list[dict]
     return result
 
 
-@router.get("/incidents")
+@router.get("/incidents", response_model=list[IncidentOut])
 def list_incidents(status: str | None = None, db: Session = Depends(get_db)):
     q = db.query(Incident).order_by(Incident.id.desc())
     if status:

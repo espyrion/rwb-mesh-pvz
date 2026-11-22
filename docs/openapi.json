@@ -18,7 +18,31 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/deep": {
+      "get": {
+        "tags": [
+          "service"
+        ],
+        "summary": "Health Deep",
+        "description": "Проверка инвариантов данных: то, что обычный /health не увидит.\n\nДешёвые запросы, пригодные для мониторинга: переполнение и отрицательные значения\nячеек, резерв больше остатка, заказ без маршрута, пустой ledger при выданных заказах.",
+        "operationId": "health_deep_api_v1_health_deep_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeepHealthOut"
+                }
               }
             }
           }
@@ -65,7 +89,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PvzOut"
+                  },
+                  "title": "Response List Pvz Api V1 Pvz Get"
+                }
               }
             }
           },
@@ -105,7 +135,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PvzOut"
+                }
               }
             }
           },
@@ -159,7 +191,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/pvz/{pvz_id}/enable": {
@@ -199,7 +236,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/sellers": {
@@ -214,7 +256,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SellerOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Sellers Api V1 Sellers Get"
+                }
               }
             }
           }
@@ -244,7 +292,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SellerOut"
+                }
               }
             }
           },
@@ -297,7 +347,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -353,6 +408,37 @@
               ],
               "title": "Seller Id"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 500,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Сколько вернуть; без него — все",
+              "title": "Limit"
+            },
+            "description": "Сколько вернуть; без него — все"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -360,7 +446,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemOut"
+                  },
+                  "title": "Response List Items Api V1 Items Get"
+                }
               }
             }
           },
@@ -400,7 +492,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ItemOut"
+                }
               }
             }
           },
@@ -464,7 +558,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/ledger": {
@@ -524,6 +623,53 @@
               ],
               "title": "Party Id"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Вид начисления: delivery, storage, commission…",
+              "title": "Kind"
+            },
+            "description": "Вид начисления: delivery, storage, commission…"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -531,7 +677,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LedgerRowOut"
+                  },
+                  "title": "Response List Ledger Api V1 Ledger Get"
+                }
               }
             }
           },
@@ -584,7 +736,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -608,6 +765,73 @@
               ],
               "title": "Status"
             }
+          },
+          {
+            "name": "pvz_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Заказы, где ПВЗ — источник или получатель",
+              "title": "Pvz Id"
+            },
+            "description": "Заказы, где ПВЗ — источник или получатель"
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Поиск по коду (без учёта регистра)",
+              "title": "Code"
+            },
+            "description": "Поиск по коду (без учёта регистра)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 500,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Сколько вернуть; без него — все",
+              "title": "Limit"
+            },
+            "description": "Сколько вернуть; без него — все"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -615,7 +839,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderOut"
+                  },
+                  "title": "Response List Orders Api V1 Orders Get"
+                }
               }
             }
           },
@@ -655,7 +885,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OrderOut"
+                }
               }
             }
           },
@@ -709,7 +941,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/orders/{order_id}/transit": {
@@ -749,7 +986,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/orders/{order_id}/cancel": {
@@ -790,7 +1032,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/orders/{order_id}/issue": {
@@ -830,7 +1077,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/routes/compare": {
@@ -875,7 +1127,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CompareOut"
+                }
               }
             }
           },
@@ -932,7 +1186,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EdgeOut"
+                  },
+                  "title": "Response List Edges Api V1 Edges Get"
+                }
               }
             }
           },
@@ -972,7 +1232,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeOut"
+                }
               }
             }
           },
@@ -1026,7 +1288,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/edges/{edge_id}/enable": {
@@ -1066,7 +1333,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/routes": {
@@ -1099,7 +1371,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RouteOut"
+                  },
+                  "title": "Response List Routes Api V1 Routes Get"
+                }
               }
             }
           },
@@ -1139,7 +1417,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/RouteOut"
+                }
               }
             }
           },
@@ -1186,7 +1466,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IncidentOut"
+                  },
+                  "title": "Response List Incidents Api V1 Incidents Get"
+                }
               }
             }
           },
@@ -1257,7 +1543,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/orders/{order_id}/return": {
@@ -1297,7 +1588,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/clock": {
@@ -1312,7 +1608,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ClockOut"
+                }
               }
             }
           }
@@ -1347,7 +1645,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StorageAccrualOut"
+                }
               }
             }
           },
@@ -1361,7 +1661,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/pvz": {
@@ -1419,7 +1724,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PvzAnalyticsOut"
+                }
               }
             }
           },
@@ -1491,7 +1798,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAnalyticsOut"
+                }
               }
             }
           },
@@ -1520,7 +1829,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryOut"
+                }
               }
             }
           }
@@ -1587,7 +1898,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationOut"
+                  },
+                  "title": "Response List Notifications Api V1 Notifications Get"
+                }
               }
             }
           },
@@ -1604,21 +1921,21 @@
         }
       }
     },
-    "/api/v1/track/{code}": {
+    "/api/v1/track/{token}": {
       "get": {
         "tags": [
           "track"
         ],
         "summary": "Track Order",
-        "operationId": "track_order_api_v1_track__code__get",
+        "operationId": "track_order_api_v1_track__token__get",
         "parameters": [
           {
-            "name": "code",
+            "name": "token",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Code"
+              "title": "Token"
             }
           }
         ],
@@ -1627,7 +1944,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TrackOut"
+                }
               }
             }
           },
@@ -1656,7 +1975,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
               }
             }
           }
@@ -1666,6 +1987,253 @@
   },
   "components": {
     "schemas": {
+      "CheckOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "ok"
+        ],
+        "title": "CheckOut"
+      },
+      "ClockOut": {
+        "properties": {
+          "virtual_now": {
+            "type": "string",
+            "title": "Virtual Now"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "virtual_now"
+        ],
+        "title": "ClockOut"
+      },
+      "CompareOut": {
+        "properties": {
+          "mesh": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlannedRouteOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hub": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlannedRouteOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chosen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "from_pvz": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Pvz"
+          },
+          "to_pvz": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Pvz"
+          }
+        },
+        "type": "object",
+        "title": "CompareOut"
+      },
+      "DeepHealthOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckOut"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "title": "DeepHealthOut"
+      },
+      "EdgeOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "from_pvz": {
+            "type": "integer",
+            "title": "From Pvz"
+          },
+          "to_pvz": {
+            "type": "integer",
+            "title": "To Pvz"
+          },
+          "from_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Code"
+          },
+          "to_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Code"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "cost_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Rub"
+          },
+          "hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "from_pvz",
+          "to_pvz"
+        ],
+        "title": "EdgeOut"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1678,6 +2246,109 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HealthOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HealthOut"
+      },
+      "IncidentOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "resolved_route_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved Route Id"
+          },
+          "edge_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "IncidentOut"
       },
       "ItemCreate": {
         "properties": {
@@ -1731,6 +2402,326 @@
         ],
         "title": "ItemCreate"
       },
+      "ItemOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "seller_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seller Id"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "reserved_qty": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reserved Qty"
+          },
+          "available_qty": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Qty"
+          },
+          "cell_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cell Size"
+          },
+          "cells": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cells"
+          },
+          "stored_pvz_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Pvz Id"
+          },
+          "stored_pvz_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Pvz Code"
+          },
+          "accepted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "price_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Rub"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sku"
+        ],
+        "title": "ItemOut"
+      },
+      "LedgerRowOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "party": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Party"
+          },
+          "party_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Party Id"
+          },
+          "amount_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Rub"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "LedgerRowOut"
+      },
+      "NotificationOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          },
+          "audience": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "NotificationOut"
+      },
       "OrderCreate": {
         "properties": {
           "item_id": {
@@ -1773,6 +2764,583 @@
         ],
         "title": "OrderCreate"
       },
+      "OrderOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "sku": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sku"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "from_pvz": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Pvz"
+          },
+          "from_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Code"
+          },
+          "to_pvz": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Pvz"
+          },
+          "to_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Code"
+          },
+          "route_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Id"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "assembled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assembled At"
+          },
+          "issued_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued At"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "return_deadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Deadline"
+          },
+          "buyer_total_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Total Rub"
+          },
+          "seller_net_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seller Net Rub"
+          },
+          "return_route_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Route Id"
+          },
+          "public_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "status"
+        ],
+        "title": "OrderOut"
+      },
+      "PlannedRouteOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SegmentOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
+          },
+          "total_cost_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Rub"
+          },
+          "total_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Hours"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "available"
+        ],
+        "title": "PlannedRouteOut"
+      },
+      "PvzAnalyticsOut": {
+        "properties": {
+          "pvz": {
+            "$ref": "#/components/schemas/PvzOut"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "revenue": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue"
+          },
+          "revenue_total_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Total Rub"
+          },
+          "deductions": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deductions"
+          },
+          "deductions_total_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deductions Total Rub"
+          },
+          "ledger_net_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ledger Net Rub"
+          },
+          "op_costs_modeled_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Op Costs Modeled Rub"
+          },
+          "fixed_costs_modeled_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fixed Costs Modeled Rub"
+          },
+          "profit_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profit Rub"
+          },
+          "storage_cell_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Cell Days"
+          },
+          "orders_issued": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orders Issued"
+          },
+          "accepted_units": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted Units"
+          },
+          "utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Pct"
+          },
+          "ledger": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ledger"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pvz"
+        ],
+        "title": "PvzAnalyticsOut"
+      },
+      "PvzOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "capacity_cells": {
+            "type": "integer",
+            "title": "Capacity Cells"
+          },
+          "used_cells": {
+            "type": "integer",
+            "title": "Used Cells"
+          },
+          "free_cells": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Cells"
+          },
+          "utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Pct"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "is_hub": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Hub"
+          },
+          "storage_rate_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Rate Day"
+          },
+          "op_fee": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Op Fee"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "name",
+          "city",
+          "capacity_cells",
+          "used_cells"
+        ],
+        "title": "PvzOut"
+      },
       "RelocateRequest": {
         "properties": {
           "to_pvz_id": {
@@ -1796,6 +3364,709 @@
         },
         "type": "object",
         "title": "RerouteRequest"
+      },
+      "RouteOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
+          },
+          "total_cost_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Rub"
+          },
+          "total_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Hours"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "RouteOut"
+      },
+      "SegmentOut": {
+        "properties": {
+          "edge_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Id"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "from_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Code"
+          },
+          "to_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Code"
+          },
+          "from_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Name"
+          },
+          "to_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Name"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "cost_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Rub"
+          },
+          "hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours"
+          }
+        },
+        "type": "object",
+        "title": "SegmentOut"
+      },
+      "SellerAnalyticsOut": {
+        "properties": {
+          "seller": {
+            "$ref": "#/components/schemas/SellerOut"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "revenue": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue"
+          },
+          "costs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costs"
+          },
+          "profit_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profit Rub"
+          },
+          "orders": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orders"
+          },
+          "ledger": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ledger"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seller"
+        ],
+        "title": "SellerAnalyticsOut"
+      },
+      "SellerOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "commission_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commission Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SellerOut"
+      },
+      "StorageAccrualOut": {
+        "properties": {
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "charged_total_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Charged Total Rub"
+          },
+          "by_pvz": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By Pvz"
+          },
+          "alerts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alerts"
+          },
+          "virtual_now": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Virtual Now"
+          }
+        },
+        "type": "object",
+        "title": "StorageAccrualOut"
+      },
+      "SummaryOut": {
+        "properties": {
+          "orders": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Orders"
+          },
+          "ledger": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Ledger"
+          },
+          "routes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Routes"
+          },
+          "ledger_by_kind": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "number"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ledger By Kind"
+          },
+          "logistics_cost_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logistics Cost Rub"
+          },
+          "storage_charged_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Charged Rub"
+          },
+          "incidents_open": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidents Open"
+          }
+        },
+        "type": "object",
+        "required": [
+          "orders",
+          "ledger",
+          "routes"
+        ],
+        "title": "SummaryOut"
+      },
+      "TrackEventOut": {
+        "properties": {
+          "ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "title": "TrackEventOut"
+      },
+      "TrackOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "status_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Label"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "assembled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assembled At"
+          },
+          "issued_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued At"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "return_deadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Deadline"
+          },
+          "buyer_total_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Total Rub"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrackPartyOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrackPartyOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "timeline": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TrackEventOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeline"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "status"
+        ],
+        "title": "TrackOut"
+      },
+      "TrackPartyOut": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "title": "TrackPartyOut"
       },
       "ValidationError": {
         "properties": {
@@ -1836,6 +4107,14 @@
           "type"
         ],
         "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Роль определяется ключом: pvz / seller / admin. Демо-ключи: demo-pvz-key, demo-seller-key, demo-admin-key (переопределяются MESH_*_KEY)."
       }
     }
   }

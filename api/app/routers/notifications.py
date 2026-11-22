@@ -6,12 +6,13 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import Notification
+from ..responses import NotificationOut
 from ..serializers import notification_dict
 
 router = APIRouter(tags=["notifications"])
 
 
-@router.get("/notifications")
+@router.get("/notifications", response_model=list[NotificationOut])
 def list_notifications(
     audience: str | None = Query(default=None, description="pvz | seller"),
     order_id: int | None = None,

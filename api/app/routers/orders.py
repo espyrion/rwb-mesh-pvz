@@ -1,12 +1,15 @@
 """Заказы: создание с маршрутом, сборка, транзит, выдача."""
 from __future__ import annotations
 
+import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from .. import money, routing, storage
+from ..paging import page
+from ..responses import OrderOut
 from ..clock import now
 from ..config import p
 from ..db import get_db
@@ -76,6 +79,7 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
         route_id=route.id,
         created_at=now(db),
         idempotency_key=payload.idempotency_key,
+        public_token=secrets.token_hex(6),
     )
     db.add(order)
     db.flush()
@@ -98,15 +102,27 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
     return {"order": order_dict(db, order), "route": route_dict(route), "quote": quote, "comparison": comparison}
 
 
-@router.get("/orders")
-def list_orders(status: str | None = None, db: Session = Depends(get_db)):
+@router.get("/orders", response_model=list[OrderOut])
+def list_orders(
+    response: Response,
+    status: str | None = None,
+    pvz_id: int | None = Query(default=None, description="Заказы, где ПВЗ — источник или получатель"),
+    code: str | None = Query(default=None, description="Поиск по коду (без учёта регистра)"),
+    limit: int | None = Query(default=None, ge=1, le=500, description="Сколько вернуть; без него — все"),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
     q = db.query(Order).order_by(Order.id.desc())
     if status:
         q = q.filter(Order.status == status)
-    return [order_dict(db, row) for row in q.all()]
+    if pvz_id is not None:
+        q = q.filter((Order.from_pvz == pvz_id) | (Order.to_pvz == pvz_id))
+    if code:
+        q = q.filter(Order.code.ilike(f"%{code.strip()}%"))
+    return [order_dict(db, row) for row in page(q, response, limit, offset)]
 
 
-@router.get("/orders/{order_id}")
+@router.get("/orders/{order_id}", response_model=OrderOut)
 def get_order(order_id: int, db: Session = Depends(get_db)):
     row = db.get(Order, order_id)
     if row is None:

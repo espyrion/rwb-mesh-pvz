@@ -1,7 +1,8 @@
-"""Публичное отслеживание заказа покупателем по коду (без авторизации).
+"""Публичное отслеживание заказа покупателем по токену (без авторизации).
 
 Покупатель не входит в MVP как отдельное приложение: вместо клиента — страница
-отслеживания по коду заказа. Деньги продавца и маркетплейса наружу не отдаются.
+отслеживания по ссылке с публичным токеном. Деньги продавца и маркетплейса
+наружу не отдаются, последовательный код заказа для поиска не используется.
 """
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..responses import TrackOut
 from ..models import Order, Pvz, Route
 from ..serializers import iso
 
@@ -54,11 +56,14 @@ def _timeline(order: Order, route: Route | None) -> list[dict]:
     return events
 
 
-@router.get("/track/{code}")
-def track_order(code: str, db: Session = Depends(get_db)):
-    order = db.query(Order).filter(Order.code == code.strip().upper()).first()
+@router.get("/track/{token}", response_model=TrackOut)
+def track_order(token: str, db: Session = Depends(get_db)):
+    # Ищем только по публичному токену: код ORD-00001 последовательный и позволял бы
+    # перебрать чужие заказы. Токен выдаётся продавцу вместе с заказом (12 hex-символов).
+    value = token.strip().lower()
+    order = db.query(Order).filter(Order.public_token == value).first() if len(value) >= 8 else None
     if order is None:
-        raise HTTPException(404, "заказ с таким кодом не найден")
+        raise HTTPException(404, "заказ не найден: нужен код из ссылки покупателя (12 символов)")
     route = db.get(Route, order.route_id) if order.route_id else None
     destination = db.get(Pvz, order.to_pvz)
     source = db.get(Pvz, order.from_pvz)

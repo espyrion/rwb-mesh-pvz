@@ -24,10 +24,10 @@ def test_write_without_key_is_401(client):
 
 
 def test_reads_and_tracking_are_public(client):
-    code = create_order(client)["order"]["code"]
+    token = create_order(client)["order"]["public_token"]
     anonymous = _anonymous()
     assert anonymous.get("/api/v1/orders").status_code == 200
-    assert anonymous.get(f"/api/v1/track/{code}").status_code == 200
+    assert anonymous.get(f"/api/v1/track/{token}").status_code == 200
 
 
 def test_pvz_can_assemble_but_cannot_open_order(client):

@@ -132,7 +132,7 @@ async function renderDashboard() {
   const summary = await api("/analytics/summary");
   const statuses = summary.orders.by_status || {};
   const cards = [
-    { title: "Заказов всего", value: num(summary.orders.total), hint: "во всех статусах" },
+    { title: "Заказов всего", value: num(summary.orders.total), hint: `mesh ${Math.round((summary.routes.mesh_share || 0) * 100)}% против хаба` },
     { title: "Логистика (внешние затраты)", value: money(summary.logistics_cost_rub), hint: "не прибыль цепочки" },
     { title: "Начислено за хранение", value: money(summary.storage_charged_rub), hint: "ПВЗ, ₽" },
     { title: "Открытых инцидентов", value: num(summary.incidents_open), hint: "требуют решения" },
@@ -144,7 +144,7 @@ async function renderDashboard() {
   });
   const statusRows = Object.entries(statuses).map(([status, count]) => `<tr><td>${pill(status)}</td><td class="num">${count}</td></tr>`);
   const pvzRows = points().map((row) => {
-    const cls = row.utilization_pct >= 85 ? "warn" : "";
+    const cls = row.utilization_pct >= 85 ? "warn" : row.utilization_pct >= 70 ? "mid" : "";
     return `<tr>
       <td><strong>${esc(row.code)}</strong><br><span class="muted small">${esc(row.name)}</span></td>
       <td>${esc(row.city)}</td>
@@ -362,6 +362,7 @@ async function renderOrders() {
     if (order.status === "issued") actions.push(`<button class="btn danger small" data-action="return" data-id="${order.id}">Возврат</button>`);
     if (["routed", "rerouted", "assembled"].includes(order.status)) actions.push(`<button class="btn danger small" data-action="cancel" data-id="${order.id}">Отменить</button>`);
     actions.push(`<button class="btn ghost small" data-action="ledger" data-id="${order.id}">Начисления</button>`);
+    if (order.public_token) actions.push(`<button class="btn ghost small" data-action="track-link" data-token="${order.public_token}">Ссылка покупателю</button>`);
     return `<tr>
       <td><strong>${esc(order.code)}</strong><br><span class="muted small">${esc(order.title || "")} × ${order.qty}</span></td>
       <td>${order.from_code} → ${order.to_code}</td>
@@ -539,11 +540,11 @@ async function renderBuyer() {
   $("#page").innerHTML = `
     <div class="card"><h2>Отслеживание заказа</h2>
       <div class="inline">
-        <label style="min-width:220px">Код заказа<input id="track-code" placeholder="ORD-00001" value="${esc(state.buyerCode)}"></label>
+        <label style="min-width:260px">Код из ссылки покупателя<input id="track-code" placeholder="a1b2c3d4e5f6" value="${esc(state.buyerCode)}"></label>
         <button class="btn" data-action="track">Показать</button>
       </div>
-      <div class="hint">Страница покупателя публичная: код, статус, сроки и стоимость доставки. Комиссии
-      маркетплейса и расчёты продавца здесь не показываются.</div>
+      <div class="hint">Страница публичная: статус, сроки и стоимость доставки. Внутренний номер заказа здесь не работает —
+      он последовательный, и по нему перебирались бы чужие посылки. Комиссии и расчёты продавца не показываются.</div>
     </div>${card}`;
 }
 
@@ -563,12 +564,21 @@ async function render() {
   const page = pages[state.page];
   $("#page-title").textContent = page.title;
   $("#page-subtitle").textContent = page.subtitle;
-  document.querySelectorAll(".nav-item").forEach((button) => button.classList.toggle("active", button.dataset.page === state.page));
+  document.querySelectorAll(".nav-item").forEach((button) => {
+    const active = button.dataset.page === state.page;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  const container = $("#page");
+  container.classList.add("is-loading");
   try {
     await loadCatalog();
     await page.render();
   } catch (error) {
-    $("#page").innerHTML = `<div class="card"><h2>Ошибка</h2><p>${esc(error.message)}</p><p class="muted small">Проверьте, что API запущен и доступен по /api/v1.</p></div>`;
+    container.innerHTML = `<div class="card"><h2>Ошибка</h2><p>${esc(error.message)}</p><p class="muted small">Проверьте, что API запущен и доступен по /api/v1.</p></div>`;
+  } finally {
+    container.classList.remove("is-loading");
   }
 }
 
@@ -590,8 +600,18 @@ document.addEventListener("click", async (event) => {
   if (action === "issue") result = await guard(api(`/orders/${id}/issue`, { method: "POST" }), "Заказ выдан, начисления сформированы");
   if (action === "return") result = await guard(api(`/orders/${id}/return`, { method: "POST" }), "Возврат оформлен");
   if (action === "cancel") result = await guard(api(`/orders/${id}/cancel`, { method: "POST" }), "Заказ отменён");
+  if (action === "track-link") {
+    const url = `${location.origin}/?track=${button.dataset.token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("Ссылка покупателю скопирована", "ok");
+    } catch {
+      toast(url, "ok");
+    }
+    return;
+  }
   if (action === "track") {
-    state.buyerCode = ($("#track-code")?.value || "").trim().toUpperCase();
+    state.buyerCode = ($("#track-code")?.value || "").trim().toLowerCase();
     state.buyerData = null;
     state.buyerError = null;
     try {
@@ -644,5 +664,15 @@ if (roleSelect) {
     localStorage.setItem("meshRole", roleSelect.value);
     location.reload();
   });
+}
+
+const deepLink = new URLSearchParams(location.search).get("track");
+if (deepLink) {
+  state.page = "buyer";
+  state.buyerCode = deepLink.trim().toLowerCase();
+  api(`/track/${encodeURIComponent(state.buyerCode)}`)
+    .then((data) => { state.buyerData = data; })
+    .catch((error) => { state.buyerError = error.message; })
+    .finally(render);
 }
 render();

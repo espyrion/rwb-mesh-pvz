@@ -19,6 +19,8 @@ if DATABASE_URL.startswith("sqlite"):
     def _fk_on(dbapi_conn, _rec):  # pragma: no cover - infra
         cur = dbapi_conn.cursor()
         cur.execute("PRAGMA foreign_keys=ON")
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA busy_timeout=5000")
         cur.close()
 
 
@@ -39,6 +41,7 @@ def get_db():
 
 def init_db(seed_if_empty: bool = True) -> None:
     Base.metadata.create_all(engine)
+    _ensure_schema()
     if not seed_if_empty:
         return
     from .models import Pvz
@@ -47,3 +50,29 @@ def init_db(seed_if_empty: bool = True) -> None:
     with SessionLocal() as session:
         if session.query(Pvz).count() == 0:
             seed(session)
+
+
+def _ensure_schema() -> None:
+    """Лёгкая миграция под уже существующие базы (create_all не добавляет колонки).
+
+    Полноценные миграции — Alembic; здесь только то, без чего старый том не поднимется.
+    """
+    import secrets
+
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.exec_driver_sql('PRAGMA table_info("order")')}
+        if "public_token" not in cols:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN public_token VARCHAR(24)')
+            conn.exec_driver_sql(
+                'CREATE UNIQUE INDEX IF NOT EXISTS ix_order_public_token ON "order" (public_token)'
+            )
+    from .models import Order
+
+    with SessionLocal() as session:
+        stale = session.query(Order).filter(Order.public_token.is_(None)).all()
+        for row in stale:
+            row.public_token = secrets.token_hex(6)
+        if stale:
+            session.commit()

@@ -105,6 +105,7 @@ def order_dict(session: Session, order: Order) -> dict:
         "buyer_total_rub": order.buyer_total_rub,
         "seller_net_rub": order.seller_net_rub,
         "return_route_id": order.return_route_id,
+        "public_token": order.public_token,
     }
 
 

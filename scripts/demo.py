@@ -189,11 +189,12 @@ def main() -> int:
     order = created["order"]
     print(f"  Заказ {order['code']}: {order['from_code']} → {order['to_code']}, "
           f"{money(order['buyer_total_rub'])}, схема {order['route']['kind']}")
-    track = call(f"/track/{order['code']}")
+    print(f"  Ссылка покупателю: {ROOT}/?track={order['public_token']} (код заказа для поиска не годится)")
+    track = call(f"/track/{order['public_token']}")
     print(f"  Покупатель видит: «{track['status_label']}», событий в истории: {len(track['timeline'])}")
     cancelled = call(f"/orders/{order['id']}/cancel", "POST")["order"]
     print(f"  Отмена до выдачи: {cancelled['status']}, резерв снят, остаток вернулся в ячейки")
-    after = call(f"/track/{order['code']}")
+    after = call(f"/track/{order['public_token']}")
     print(f"  Покупатель видит: «{after['status_label']}», история дополнена")
 
     title("ГОТОВО")
