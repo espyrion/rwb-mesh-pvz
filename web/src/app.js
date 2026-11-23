@@ -16,6 +16,9 @@ const state = {
   buyerCode: "",
   buyerData: null,
   buyerError: null,
+  mapNode: null,
+  mapOrderId: null,
+  mapFailure: null,
   econ: { mesh_bonus: 15, storage_rate: 5, fixed_cost: 1200, commission_pct: 12, mesh_share: 30, ops: 60 },
 };
 
@@ -665,6 +668,7 @@ document.addEventListener("input", (event) => {
 /* ---------- роутинг ---------- */
 const pages = {
   dashboard: { title: "Дашборд", subtitle: "Сводка по сети ПВЗ и денежным потокам", render: renderDashboard },
+  map: { title: "Карта сети", subtitle: "Схема ПВЗ, сегментов и маршрутов: отказ узла прямо на карте", render: () => renderMap() },
   economics: { title: "Экономика", subtitle: "Что если: ставки, прибыль четырёх сторон, порог безубыточности", render: renderEconomics },
   pvz: { title: "Кабинет ПВЗ", subtitle: "Приёмка, остатки, хранение и доходы точки", render: renderPvz },
   seller: { title: "Кабинет продавца", subtitle: "Остатки, заказы и расчёты продавца", render: renderSeller },
