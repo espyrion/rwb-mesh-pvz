@@ -207,6 +207,7 @@ async function renderPvz() {
       <div class="section-title">
         <h2>Кабинет ПВЗ</h2>
         <label>Точка выдачи<select id="pvz-select">${pvzOptions(pvz.id)}</select></label>
+        ${pvz.is_hub ? "" : `<button class="btn ghost" data-action="${pvz.is_active ? "node-down" : "node-up"}" data-id="${pvz.id}">${pvz.is_active ? "Вывести из строя" : "Вернуть в строй"}</button>`}
       </div>
       <div class="grid cols-4" style="margin-top:12px">
         <div><h3>Ёмкость</h3><div class="metric small">${pvz.used_cells} / ${pvz.capacity_cells}</div><div class="hint">свободно ${pvz.free_cells} ячеек</div></div>
@@ -214,7 +215,8 @@ async function renderPvz() {
         <div><h3>Прибыль за период</h3><div class="metric small ${analytics.profit_rub >= 0 ? "good" : "bad"}">${money(analytics.profit_rub)}</div><div class="hint">ledger ${money(analytics.ledger_net_rub)} − операции ${money(analytics.op_costs_modeled_rub)} − постоянные ${money(analytics.fixed_costs_modeled_rub)}</div></div>
         <div><h3>Хранение</h3><div class="metric small">${money(analytics.revenue.storage || 0)}</div><div class="hint">${analytics.storage_cell_days} ячейко-дней</div></div>
       </div>
-      <div class="hint">${esc(pvz.code)} · ${esc(pvz.name)} · ${esc(pvz.city)} · тариф ${money(pvz.storage_rate_day)}/ячейка·день, выдача ${money(pvz.op_fee)}</div>
+      <div class="hint">${esc(pvz.code)} · ${esc(pvz.name)} · ${esc(pvz.city)} · тариф ${money(pvz.storage_rate_day)}/ячейка·день, выдача ${money(pvz.op_fee)}
+        ${pvz.is_active ? "" : '<br><strong>Точка выведена из строя:</strong> маршруты через неё не строятся, приёмка и выдача недоступны.'}</div>
     </div>
 
     <div class="grid cols-2">
@@ -755,6 +757,17 @@ document.addEventListener("click", async (event) => {
     }
   }
   if (action === "enable-edge") result = await guard(api(`/edges/${id}/enable`, { method: "POST" }), "Сегмент включён");
+  if (action === "node-down") {
+    if (!confirm("Вывести ПВЗ из строя? Свободные остатки переедут к соседям (перемещение 60 ₽), заказы будут переадресованы.")) return;
+    result = await guard(api(`/pvz/${id}/disable`, { method: "POST" }));
+    if (result) {
+      const moved = (result.evacuated || []).length;
+      const reassigned = (result.orders || []).length;
+      const left = (result.unresolved || []).length;
+      toast(`ПВЗ ${result.pvz.code} выведен из строя: перемещено партий ${moved}, обработано заказов ${reassigned}, не решено ${left}, затраты ${money(result.relocation_total_rub)}.`, left ? "" : "ok");
+    }
+  }
+  if (action === "node-up") result = await guard(api(`/pvz/${id}/enable`, { method: "POST" }), "ПВЗ вернулся в строй");
   if (action === "reroute") result = await guard(api(`/incidents/${id}/reroute`, { method: "POST", body: { accept_latency: true } }), "Маршрут перевыбран");
   if (action === "relocate") {
     const target = prompt("Введите ID ПВЗ для перемещения остатка (см. список точек):", String(points().find((row) => row.id !== state.pvzId)?.id || 2));

@@ -160,6 +160,7 @@
           "catalog"
         ],
         "summary": "Disable Pvz",
+        "description": "Вывести точку из строя: блокировка, эвакуация остатков, переадресация заказов.",
         "operationId": "disable_pvz_api_v1_pvz__pvz_id__disable_post",
         "parameters": [
           {

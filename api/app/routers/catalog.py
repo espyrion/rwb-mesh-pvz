@@ -41,14 +41,18 @@ def get_pvz(pvz_id: int, db: Session = Depends(get_db)):
 
 @router.post("/pvz/{pvz_id}/disable")
 def disable_pvz(pvz_id: int, db: Session = Depends(get_db)):
+    """Вывести точку из строя: блокировка, эвакуация остатков, переадресация заказов."""
     row = db.get(Pvz, pvz_id)
     if row is None:
         raise HTTPException(404, "pvz not found")
-    row.is_active = False
-    from .incidents import incidents_for_node
+    from ..node_failure import node_down
 
-    incidents = incidents_for_node(db, pvz_id, reason=f"ПВЗ {row.code} помечен недоступным оператором")
-    return {"pvz": pvz_dict(row), "incidents": incidents}
+    try:
+        result = node_down(db, row, reason=f"ПВЗ {row.code} помечен недоступным оператором")
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    db.commit()
+    return result
 
 
 @router.post("/pvz/{pvz_id}/enable")
@@ -56,8 +60,11 @@ def enable_pvz(pvz_id: int, db: Session = Depends(get_db)):
     row = db.get(Pvz, pvz_id)
     if row is None:
         raise HTTPException(404, "pvz not found")
-    row.is_active = True
-    return {"pvz": pvz_dict(row)}
+    from ..node_failure import node_up
+
+    result = node_up(db, row)
+    db.commit()
+    return result
 
 
 @router.get("/sellers", response_model=list[SellerOut])
