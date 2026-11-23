@@ -108,7 +108,7 @@ curl http://localhost:8000/api/v1/health/deep
 
 | Job | Проверка |
 |---|---|
-| `api` (py3.11, 3.12) | `pytest api/tests -q --tb=short`, 131 тест |
+| `api` (py3.11, 3.12) | `pytest api/tests -q --tb=short`, 134 теста |
 | `economics` | `pytest economics/tests -q --tb=short`, 14 тестов |
 | `web-lint` | `node --check web/src/*.js` |
 | `contract` | перегенерация OpenAPI в `/tmp` и сравнение распарсенного JSON с `docs/openapi.json` |

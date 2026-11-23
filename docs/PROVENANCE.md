@@ -14,7 +14,7 @@
 | `docs/SCALE.md` (100/500/2000 заказов) | `scripts/simulate.py` | `python scripts/simulate.py --orders 100,500,2000 --seed 42 --write-md docs/SCALE.md` |
 | `docs/openapi.json` (40 путей) | приложение FastAPI | `python scripts/gen_openapi.py` |
 | Демо-прогон 5/5 | `scripts/demo.py` | API на :8001 с `DATABASE_URL=sqlite:////tmp/mesh-demo.db`, затем `python scripts/demo.py` |
-| Тесты 131 + 14 | `api/tests`, `economics/tests` | команды из `README.md`, раздел «Тесты» |
+| Тесты 134 + 14 = 148 | `api/tests`, `economics/tests` | команды из `README.md`, раздел «Тесты» |
 
 `docs/ECON_REPORT.md` и `docs/SCALE.md` — генерируемые файлы. Правка чисел в них руками
 запрещена: CI перегенерирует `SCALE.md` в `/tmp` и падает при расхождении; `ECON_REPORT.md`
