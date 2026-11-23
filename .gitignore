@@ -5,8 +5,13 @@ __pycache__/
 *.pyc
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
+*.dbg.db
 .pytest_cache/
 mesh-pvz.tar.gz
 web/build/
 *.log
 .local/
+.env
+.DS_Store

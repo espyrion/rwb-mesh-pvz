@@ -18,7 +18,7 @@
 | Данные и контракты | Меркушев | `api/app/models.py`, `db.py`, `seed.py`, `schemas.py` |
 | Ядро: деньги, ёмкость, маршруты, часы | Меркушев | `money.py`, `storage.py`, `routing.py`, `clock.py` |
 | HTTP-слой и сценарии | Меркушев | `api/app/routers/*`, `docs/API.md`, `docs/openapi.json` |
-| Тесты | Меркушев | `api/tests/*` (37 тестов), `economics/tests/*` (9 тестов) |
+| Тесты | Меркушев | `api/tests/*` (131 тест), `economics/tests/*` (14 тестов), контракт OpenAPI (40 путей) |
 | UI | Меркушев | `web/src/*`, `web/nginx.conf` |
 | Инфраструктура | Меркушев | `docker-compose.yml`, `api/Dockerfile`, `web/Dockerfile`, `scripts/*` |
 | План тиражирования и техплан | Меркушев | `docs/REPLICATION.md` |
@@ -26,8 +26,9 @@
 ## Проверяемость вклада
 
 * история коммитов: `git log --stat --oneline` — каждый блок landed отдельным коммитом;
-* тесты и отчёт воспроизводятся одной командой: `bash scripts/run_tests.sh`;
-* демонстрация воспроизводится на живом API: `python3 scripts/demo.py`.
+* ветки и их состояние перечислены в `docs/PROVENANCE.md` (актуальная — `master`, HEAD `fc55d8a`);
+* тесты и отчёт воспроизводятся одной командой: `bash scripts/run_tests.sh` (145 тестов);
+* демонстрация воспроизводится на живом API: `python3 scripts/demo.py` (5/5 шагов).
 
 ## Ограничения и честность данных
 

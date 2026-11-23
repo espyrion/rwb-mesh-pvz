@@ -15,13 +15,17 @@
 | `api/` | FastAPI + SQLAlchemy (SQLite): приёмка, заказы, маршрутизация mesh/hub, выдача, возвраты и отмена, инциденты, виртуальные часы, аналитика, ledger; роли по API-ключам |
 | `web/` | Рабочее место ПВЗ и продавца (одно приложение с ролями) + страница покупателя, nginx + vanilla JS, без сборки |
 | `economics/` | Экономическая модель (`model.py`), параметры (`params.yaml`) со схемой проверки, сценарии «что если» (`scenario.py`), симуляция дня сети (`network.py`), генератор отчёта (`report.py`) |
-| `api/tests/`, `economics/tests/` | 92 теста: API (включая 6 демо-сценариев), экономическая модель и симуляция дня |
+| `api/tests/`, `economics/tests/` | **145 тестов**: 131 в API (включая 5 демо-сценариев и контрактные тесты OpenAPI) и 14 в экономике (модель, сценарии, симуляция дня) |
 | `docs/` | Экономический отчёт, описание API, сценарии, план тиражирования и техплан, вклад участников |
 
 ## Быстрый старт (Docker)
 
 ```bash
-docker compose up --build
+# production-режим: собранные образы, код и статика внутри контейнеров
+docker compose up -d --build
+
+# dev-режим: api/ смонтирован с --reload, web/src отдаётся напрямую
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
 * UI: http://localhost:5173
@@ -32,8 +36,13 @@ docker compose up --build
 2 продавца, 6 товаров). Сбросить состояние:
 
 ```bash
-docker compose down -v && docker compose up --build
+docker compose down -v && docker compose up -d --build
 ```
+
+> **После правок кода или фронта образ нужно пересобрать.** `web/src` и `api/` в production-режиме
+> запекаются в образ: без `docker compose up -d --build` на :5173 и :8000 останется старый код.
+> В dev-режиме (`docker-compose.dev.yml`) исходники смонтированы, и пересборка нужна только после
+> изменения зависимостей или Dockerfile.
 
 ### Роли и ключи API
 
@@ -71,17 +80,22 @@ UI без Docker: откройте `web/src/index.html` нельзя (нужен
 ## Тесты
 
 ```bash
-# API (92 теста: API, модель, симуляция)
-cd api && ../.venv/bin/python -m pytest tests -q
+# API: 131 тест (эндпоинты, 5 демо-сценариев, инварианты, контракт OpenAPI)
+cd api && DATABASE_URL=sqlite:////tmp/mesh-pytest.db ../.venv/bin/python -m pytest tests -q --tb=short
 
-# Экономика (9 тестов на ручных числах + сборка отчёта)
-cd .. && .venv/bin/python -m pytest economics/tests -q
+# Экономика: 14 тестов (модель, сценарии, отчёт, симуляция)
+cd .. && .venv/bin/python -m pytest economics/tests -q --tb=short
 
 # Все сразу
 bash scripts/run_tests.sh
 ```
 
 Сценарии с печатью отчёта: `cd api && ../.venv/bin/python -m pytest tests/test_scenarios.py -s -q`.
+
+CI (`.github/workflows/ci.yml`) гоняет то же самое на Python 3.11/3.12 и дополнительно: `node --check`
+для фронта, сверку перегенерированного OpenAPI с `docs/openapi.json` (по распарсенному JSON, не по
+байтам) и проверку, что `docs/SCALE.md` не устарел. Все джобы работают на SQLite в `/tmp`, без Docker
+и внешней сети.
 
 ## Как пользоваться 
 
@@ -187,7 +201,10 @@ bash scripts/run_tests.sh
 ![Сравнение mesh и хаба, таблица сегментов](docs/screenshots/05-routes.png)
 
 Сравнение двух схем на одном запросе: внутри города mesh даёт 90 ₽ и 3 ч против 135,5 ₽ и 30 ч через
-хаб в Казани. Внизу — сегменты сети с кнопкой «Отключить»: это ручка для демонстрации инцидентов.
+хаб в Казани. Ответ `GET /api/v1/routes/compare` содержит не только цифры, но и машинное основание
+выбора: `reason_code` (`mesh_same_city`, `mesh_cheapest`, `hub_cheaper`, `hub_required`,
+`overflow_to_hub`, `no_route`) и флаг `overflow` — заказ ушёл на хаб из-за загрузки точки не ниже 85%.
+Внизу — сегменты сети с кнопкой «Отключить»: это ручка для демонстрации инцидентов.
 
 ### Инциденты
 
@@ -255,13 +272,17 @@ python3 scripts/record_demo.py     # то же + docs/demo-backup.mp4 (реал�
 
 * [docs/ECON_MODEL.md](docs/ECON_MODEL.md) — модель, допущения, формулы, границы применимости.
 * [docs/ECON_REPORT.md](docs/ECON_REPORT.md) — расчёты по четырём сторонам, сравнение схем, пороги.
-* [docs/API.md](docs/API.md) — эндпоинты, модели данных, идемпотентность.
-* [docs/SCENARIOS.md](docs/SCENARIOS.md) — 5 демо-сценариев и что проверяет каждый.
+* [docs/API.md](docs/API.md) — эндпоинты, модели данных, идемпотентность, скоринг и инвентаризация.
+* [docs/SCENARIOS.md](docs/SCENARIOS.md) — демо-сценарии и что проверяет каждый.
 * [docs/SCALE.md](docs/SCALE.md) — что происходит при 100/500/2000 заказах в день: срок, p95, узкие места.
+* [docs/REDTEAM.md](docs/REDTEAM.md) — 10 жёстких вопросов жюри с ответами и числами.
+* [docs/PILOT.md](docs/PILOT.md) — план пилота на 30 дней: гипотезы, метрики, критерии остановки.
 * [docs/REPLICATION.md](docs/REPLICATION.md) — план тиражирования, метрики, риски и техплан.
+* [docs/SUBMISSION.md](docs/SUBMISSION.md) — чек-лист сдачи: запуск, демо, ключевые числа, ограничения.
+* [docs/PROVENANCE.md](docs/PROVENANCE.md) — откуда взято каждое число и как воспроизвести артефакты.
 * [docs/CONTRIBUTORS.md](docs/CONTRIBUTORS.md) — вклад участников и история коммитов.
 * [docs/demo-backup.mp4](docs/demo-backup.mp4) — backup-видео: реальный прогон `scripts/demo.py` (30 с, включая ссылку покупателю).
-* [docs/openapi.json](docs/openapi.json) — машинночитаемая OpenAPI-схема (37 путей, схемы ответов и `ApiKey`).
+* [docs/openapi.json](docs/openapi.json) — машинночитаемая OpenAPI-схема (40 путей, схемы ответов и `ApiKey`).
 * `scripts/backup_db.py` — резервная копия SQLite без остановки API; `scripts/run_tests.sh` — все проверки.
 
 ## Ограничения MVP
