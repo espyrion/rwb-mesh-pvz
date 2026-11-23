@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import pytest
 
+from pathlib import Path
+
 from economics.model import load_params
 from economics.network import simulate_day
 
-PATH = "/home/stingcorpse/mesh-pvz/economics/params.yaml"
+PATH = str(Path(__file__).resolve().parents[2] / "economics" / "params.yaml")
 
 
 @pytest.fixture(scope="module")
