@@ -7,12 +7,12 @@
 
 | Таблица | Назначение | Ключевые поля |
 |---|---|---|
-| `pvz` | точка выдачи или хаб | `code`, `city`, `capacity_cells`, `used_cells`, `is_hub`, `storage_rate_day`, `op_fee`, `audit_accuracy_pct`, `audit_sla_rating`, `audit_count`, `last_audit_at` |
+| `pvz` | точка выдачи или хаб | `code`, `city`, `capacity_cells`, `used_cells`, `is_hub`, `lat`, `lng`, `storage_rate_day`, `op_fee`, `audit_accuracy_pct`, `audit_sla_rating`, `audit_count`, `last_audit_at` |
 | `edge` | сегмент сети | `from_pvz`, `to_pvz`, `kind` (`local`/`trunk`), `cost_rub`, `hours`, `is_active` |
 | `seller` | продавец | `name`, `commission_pct` |
-| `item` | партия товара на хранении | `sku`, `seller_id`, `qty`, `cell_size`, `stored_pvz_id`, `status`, `price_rub`, `accepted_at` |
+| `item` | партия товара на хранении | `sku`, `seller_id`, `qty`, `cell_size`, `stored_pvz_id`, `status`, `price_rub`, `accepted_at`, `parent_batch_id` |
 | `order` | заказ | `code`, `item_id`, `qty`, `from_pvz`, `to_pvz`, `status`, `route_id`, `buyer_total_rub`, `seller_net_rub`, `idempotency_key` |
-| `route` | выбранный маршрут | `kind`, `segments_json`, `total_cost_rub`, `total_hours`, `reason` |
+| `route` | выбранный маршрут | `kind`, `segments_json`, `total_cost_rub`, `total_hours`, `reason`, `reason_code`, `overflow` |
 | `ledger` | денежные начисления | `party` (`pvz`/`marketplace`/`seller`/`buyer`), `party_id`, `amount_rub`, `kind`, `order_id`, `item_id` |
 | `incident` | нештатная ситуация | `type` (`node_down`/`late`/`no_route`/`stock_mismatch`), `order_id`, `edge_id`, `status`, `resolved_route_id` |
 | `notification` | лента событий | `audience` (`pvz`/`seller`), `text`, `payload_json` |
@@ -66,7 +66,8 @@ created → routed → assembled → in_transit → issued → returned
 эвакуируются к соседу того же города с наименьшей загрузкой и свободной ёмкостью → заказы с
 выдачей в узле переадресуются, уже собранный товар едет вместе с заказом → партии-источники
 переезжают целиком, заказы получают новый `from_pvz` → маршруты, проходившие через узел,
-перевыбираются. Каждое перемещение стоит 60 ₽ и относится на маркетплейс
+перевыбираются. При дроблении партии части сохраняют `parent_batch_id` корневой партии —
+по нему видно, из какого остатка они появились. Каждое перемещение стоит 60 ₽ и относится на маркетплейс
 (`pvz.relocation_cost_rub` в `params.yaml`).
 
 Ответ: `pvz`, `already_down`, `evacuated[]` (партия, куда, ячейки, ₽), `orders[]`
@@ -93,11 +94,29 @@ created → routed → assembled → in_transit → issued → returned
 ### Маршруты и сеть
 | Метод | Путь | Описание |
 |---|---|---|
-| GET | `/routes/compare?from=&to=&accept_latency=` | сравнение mesh и hub: сегменты, стоимость, часы, основание выбора |
+| GET | `/routes/compare?from=&to=&accept_latency=` | сравнение mesh и hub: сегменты, стоимость, часы, `chosen`, `reason`, `reason_code`, `overflow`, `load` |
 | GET | `/routes`, `/routes/{id}` | сохранённые маршруты |
 | GET | `/edges?kind=&active_only=` | сегменты сети |
 | POST | `/edges/{id}/disable` | отключить сегмент; ответ содержит затронутые инциденты |
 | POST | `/edges/{id}/enable` | включить сегмент |
+
+**Основание выбора маршрута.** `GET /routes/compare` и объект `route` в ответах заказа отдают
+машиночитаемый `reason_code` и булев `overflow`:
+
+| `reason_code` | Когда выставляется |
+|---|---|
+| `mesh_same_city` | оба ПВЗ в одном городе: магистраль не используется, выбран mesh |
+| `mesh_cheapest` | межгород, mesh дешевле и срок приемлем |
+| `hub_cheaper` | межгород, mesh дороже или медленнее при запрете удлинения срока |
+| `mesh_no_hub` | хаб недоступен (сегменты отключены), локальный путь есть |
+| `hub_required` | локального пути нет (межгород или сегменты отключены) |
+| `overflow_to_hub` | точка-источник или получатель загружена ≥ порога `network.overflow_utilization_threshold` (85%), заказ перелит на хаб |
+| `overflow_hub_unavailable` | перелив нужен, но магистраль недоступна — в `reason` явно сказано, что запасного пути нет |
+| `no_route` | нет активного пути ни по одной схеме |
+
+`overflow = true` только при `chosen = hub` и `reason_code = overflow_to_hub`. Блок `load` содержит
+`threshold_pct`, загрузку сторон `from`/`to`, флаг `triggered` и список `triggered_by` с кодом точки
+и фактической загрузкой.
 
 ### Инциденты, время, аналитика
 | Метод | Путь | Описание |
@@ -226,20 +245,22 @@ curl -X POST localhost:8000/api/v1/pvz/1/audit \
 ```bash
 curl -X POST localhost:8000/api/v1/orders -H 'Content-Type: application/json' \
   -d '{"item_id":1,"qty":1,"to_pvz_id":3}'
-# → order: routed, route.kind=mesh, cost 90, buyer_total 19019
+# → order: routed, route.kind=mesh, cost 90, buyer_total 19029
 
 curl -X POST localhost:8000/api/v1/orders/1/assemble
 curl -X POST localhost:8000/api/v1/orders/1/issue
 curl localhost:8000/api/v1/ledger?order_id=1
-# → buyer −19019, seller 16632, pvz 40, marketplace 2257; сумма = −90
+# → buyer −19029, seller 16632, pvz 40, marketplace 2267; сумма = −90
 ```
 
 ## Ошибки
 
 | Код | Когда |
 |---|---|
-| 404 | объект не найден |
-| 409 | недостаточно остатка или ячеек, недопустимый переход статуса, нет маршрута, истёк срок возврата, нет места на ПВЗ возврата |
-| 422 | невалидное тело запроса (Pydantic) |
+| 401 | нет заголовка `X-API-Key` на write-запросе |
+| 403 | ключ есть, но роль не подходит (например, `placement-score` от роли pvz) |
+| 404 | объект не найден (в том числе ПВЗ в аудите или маршруте сравнения) |
+| 409 | недостаточно остатка или ячеек, недопустимый переход статуса, нет маршрута, истёк срок возврата, нет места на ПВЗ возврата; в `POST /pvz/{id}/audit` — факт ниже резерва, выход ячеек за ёмкость, параллельное изменение строки |
+| 422 | невалидное тело или query-параметры (Pydantic): неизвестный SKU, отрицательное количество, параметр сценария вне диапазона |
 
 Сообщения на русском и содержат причину и контекст (код ПВЗ, свободные ячейки, статусы).

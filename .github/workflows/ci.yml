@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: api · py${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r api/requirements.txt
+      - name: Pytest (SQLite в /tmp)
+        working-directory: api
+        env:
+          DATABASE_URL: sqlite:////tmp/mesh-ci-api.db
+        run: python -m pytest tests -q --tb=short
+
+  economics:
+    name: economics
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r api/requirements.txt
+      - name: Pytest (модель и отчёт)
+        run: python -m pytest economics/tests -q --tb=short
+
+  web-lint:
+    name: web-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: node --check
+        run: |
+          set -euo pipefail
+          for file in web/src/*.js; do
+            echo "check $file"
+            node --check "$file"
+          done
+
+  contract:
+    name: contract · openapi
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r api/requirements.txt
+      - name: Генерация схемы во временный файл
+        run: python scripts/gen_openapi.py --out /tmp/openapi.ci.json
+      - name: Сравнение распарсенного JSON с docs/openapi.json
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+
+          fresh = json.load(open("/tmp/openapi.ci.json", encoding="utf-8"))
+          current = json.load(open("docs/openapi.json", encoding="utf-8"))
+          if fresh != current:
+              fresh_paths = set(fresh.get("paths", {}))
+              current_paths = set(current.get("paths", {}))
+              print("OpenAPI дрейф: docs/openapi.json не совпадает с приложением.", file=sys.stderr)
+              print("только в приложении:", sorted(fresh_paths - current_paths), file=sys.stderr)
+              print("только в docs:", sorted(current_paths - fresh_paths), file=sys.stderr)
+              print("перегенерируйте: python scripts/gen_openapi.py", file=sys.stderr)
+              sys.exit(1)
+          print(f"OpenAPI ok: {len(current.get('paths', {}))} путей, схемы совпадают")
+          PY
+
+  simulation-smoke:
+    name: simulation · smoke + SCALE
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r api/requirements.txt
+      - name: Smoke-прогон 100 заказов (без записи в docs)
+        run: python scripts/simulate.py --orders 100 --seed 42 --json /tmp/mesh-sim-smoke.json
+      - name: Перегенерация SCALE.md во временный файл
+        run: python scripts/simulate.py --orders 100,500,2000 --seed 42 --write-md /tmp/SCALE.ci.md
+      - name: docs/SCALE.md не устарел
+        run: |
+          if ! diff -u docs/SCALE.md /tmp/SCALE.ci.md; then
+            echo "docs/SCALE.md устарел: перегенерируйте python scripts/simulate.py --write-md docs/SCALE.md" >&2
+            exit 1
+          fi
+          echo "docs/SCALE.md актуален"
