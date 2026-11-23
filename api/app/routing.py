@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from . import clock
+from .config import p
 from .models import Edge, Pvz, Route
 
 
@@ -97,6 +98,27 @@ def _hub_id(session: Session) -> int | None:
     return hub.id if hub else None
 
 
+def utilization_pct(pvz: Pvz) -> float | None:
+    """Загрузка точки по ячейкам, %. None — если ёмкость не задана (хаб)."""
+    if not pvz.capacity_cells:
+        return None
+    return round(100.0 * pvz.used_cells / pvz.capacity_cells, 1)
+
+
+def load_state(pvz: Pvz) -> dict:
+    return {
+        "id": pvz.id,
+        "code": pvz.code,
+        "used_cells": pvz.used_cells,
+        "capacity_cells": pvz.capacity_cells,
+        "utilization_pct": utilization_pct(pvz),
+    }
+
+
+def _overflow_threshold() -> float:
+    return float(p("network", "overflow_utilization_threshold"))
+
+
 def _to_dict(session: Session, path: Path | None, kind: str) -> dict:
     if path is None:
         return {
@@ -106,6 +128,7 @@ def _to_dict(session: Session, path: Path | None, kind: str) -> dict:
             "total_cost_rub": None,
             "total_hours": None,
             "reason": "нет пути по активным сегментам",
+            "reason_code": "no_route",
         }
     pvz = {p.id: p for p in session.query(Pvz).all()}
     segments = []
@@ -132,6 +155,7 @@ def _to_dict(session: Session, path: Path | None, kind: str) -> dict:
         "total_cost_rub": round(path.total_cost_rub, 2),
         "total_hours": round(path.total_hours, 2),
         "reason": "",
+        "reason_code": kind,
     }
 
 
@@ -166,15 +190,47 @@ def compare(session: Session, src: int, dst: int, accept_latency: bool = True) -
 
     chosen = None
     reason = ""
+    reason_code = ""
+    threshold = _overflow_threshold()
+    threshold_pct = round(threshold * 100.0, 1)
+    load = {
+        "threshold_pct": threshold_pct,
+        "from": load_state(src_pvz),
+        "to": load_state(dst_pvz),
+    }
+    # Backpressure: если точка-источник или точка-получатель уже на пороге загрузки,
+    # локальная схема не тянет дополнительный поток — заказ уходит на магистраль.
+    over = []
+    for side, pvz in (("from", src_pvz), ("to", dst_pvz)):
+        util = utilization_pct(pvz)
+        if util is not None and util >= threshold_pct:
+            over.append((side, pvz, util))
+    overflow_requested = bool(over)
+    load["triggered"] = overflow_requested
+    load["triggered_by"] = [{"side": side, "code": pvz.code, "utilization_pct": util} for side, pvz, util in over]
+
     same_city = src_pvz.city == dst_pvz.city
-    if mesh_dict["available"] and hub_dict["available"]:
+    if overflow_requested and hub_dict["available"]:
+        chosen = "hub"
+        reason_code = "overflow_to_hub"
+        where = ", ".join(f"{pvz.code} ({util:.1f}%)" for _side, pvz, util in over)
+        reason = (
+            f"overflow_to_hub: {where} достигли порога {threshold_pct:.1f}% — локальная схема "
+            "не тянет дополнительный поток, заказ переведён на магистраль через хаб "
+            f"({hub_dict['total_cost_rub']:.2f} ₽ / {hub_dict['total_hours']:.1f} ч)."
+        )
+    elif overflow_requested:
+        # Перелив нужен, но магистраль недоступна: честно говорим об этом в основании.
+        reason_code = "overflow_hub_unavailable"
+    if chosen is None and mesh_dict["available"] and hub_dict["available"]:
         cheaper = mesh_dict["total_cost_rub"] <= hub_dict["total_cost_rub"]
         faster = mesh_dict["total_hours"] <= hub_dict["total_hours"]
         if same_city:
             # Магистраль не возит внутри города: hub остаётся в сравнении как альтернатива,
             # но выбранной схемой для внутригородского заказа быть не может.
             chosen = "mesh"
-            reason = (
+            reason_code = reason_code or "mesh_same_city"
+            reason += (
                 f"внутригородской заказ: магистраль не используется, выбран mesh. Локальный маршрут "
                 f"{mesh_dict['total_cost_rub']:.2f} ₽ / {mesh_dict['total_hours']:.1f} ч; "
                 f"схема через хаб для сравнения — {hub_dict['total_cost_rub']:.2f} ₽ / "
@@ -182,25 +238,30 @@ def compare(session: Session, src: int, dst: int, accept_latency: bool = True) -
             )
         elif cheaper and (faster or accept_latency):
             chosen = "mesh"
-            reason = (
+            reason_code = reason_code or "mesh_cheapest"
+            reason += (
                 f"mesh дешевле на {hub_dict['total_cost_rub'] - mesh_dict['total_cost_rub']:.2f} ₽ "
                 f"и не требует хаба; срок {mesh_dict['total_hours']:.1f} ч против {hub_dict['total_hours']:.1f} ч. "
                 "Выбран как минимальная стоимость при приемлемом сроке."
             )
         else:
             chosen = "hub"
-            reason = (
+            reason_code = reason_code or "hub_cheaper"
+            reason += (
                 "mesh дороже/медленнее базовой схемы: "
                 f"{mesh_dict['total_cost_rub']:.2f} ₽/{mesh_dict['total_hours']:.1f} ч против "
                 f"{hub_dict['total_cost_rub']:.2f} ₽/{hub_dict['total_hours']:.1f} ч."
             )
-    elif mesh_dict["available"]:
+    elif chosen is None and mesh_dict["available"]:
         chosen, reason = "mesh", "хаб недоступен (сегменты отключены), локальный маршрут доступен."
-    elif hub_dict["available"]:
+        reason_code = reason_code or "mesh_no_hub"
+    elif chosen is None and hub_dict["available"]:
         chosen, reason = "hub", "локального маршрута нет (межгород или сегменты отключены) — базовая схема через хаб."
-    else:
+        reason_code = reason_code or "hub_required"
+    elif chosen is None:
         chosen = None
         reason = "оба варианта недоступны: нет активного пути."
+        reason_code = "no_route"
 
     return {
         "from": {"id": src, "code": src_pvz.code, "city": src_pvz.city},
@@ -209,6 +270,9 @@ def compare(session: Session, src: int, dst: int, accept_latency: bool = True) -
         "hub": hub_dict,
         "chosen": chosen,
         "reason": reason,
+        "reason_code": reason_code,
+        "overflow": chosen == "hub" and reason_code == "overflow_to_hub",
+        "load": load,
         "accept_latency": accept_latency,
     }
 
@@ -222,6 +286,8 @@ def make_route(session: Session, order_id: int | None, comparison: dict, kind: s
         total_cost_rub=float(variant["total_cost_rub"] or 0.0),
         total_hours=float(variant["total_hours"] or 0.0),
         reason=reason or comparison["reason"],
+        reason_code=comparison.get("reason_code") or kind,
+        overflow=bool(comparison.get("overflow")),
         created_at=clock.now(session),
     )
     session.add(route)

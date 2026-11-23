@@ -28,6 +28,8 @@ class PvzOut(Out):
     is_hub: bool | None = None
     storage_rate_day: float | None = None
     op_fee: float | None = None
+    lat: float | None = None
+    lng: float | None = None
 
 
 class SellerOut(Out):
@@ -51,6 +53,7 @@ class ItemOut(Out):
     accepted_at: str | None = None
     status: str | None = None
     price_rub: float | None = None
+    parent_batch_id: int | None = None
 
 
 class RouteOut(Out):
@@ -61,6 +64,8 @@ class RouteOut(Out):
     total_cost_rub: float | None = None
     total_hours: float | None = None
     reason: str | None = None
+    reason_code: str | None = None
+    overflow: bool | None = None
     created_at: str | None = None
 
 
@@ -121,6 +126,7 @@ class PlannedRouteOut(Out):
     total_cost_rub: float | None = None
     total_hours: float | None = None
     reason: str | None = None
+    reason_code: str | None = None
 
 
 class PvzRefOut(Out):
@@ -134,6 +140,9 @@ class CompareOut(Out):
     hub: PlannedRouteOut | None = None
     chosen: str | None = None
     reason: str | None = None
+    reason_code: str | None = None
+    overflow: bool | None = None
+    load: dict[str, Any] | None = None
     # routing.compare() отдаёт вложенные объекты «from»/«to»; имена с подчёркиванием —
     # потому что from — ключевое слово, наружу уходит псевдоним.
     from_: PvzRefOut | None = Field(default=None, alias="from")

@@ -26,18 +26,21 @@ from .models import (
 )
 
 PVZ_ROWS = [
-    # id, code, name, city, capacity, other_stock (ячейки чужих партий, не наших товаров)
-    (1, "YOL-01", "ПВЗ Центральный", "Йошкар-Ола", 80, 8),
-    (2, "YOL-02", "ПВЗ Дубки", "Йошкар-Ола", 60, 8),
-    (3, "YOL-03", "ПВЗ Сомбатхей", "Йошкар-Ола", 70, 8),
-    (4, "YOL-04", "ПВЗ Заречный", "Йошкар-Ола", 50, 8),
-    (5, "KZN-01", "ПВЗ Баумана", "Казань", 90, 20),
-    (6, "KZN-02", "ПВЗ Горки", "Казань", 60, 10),
-    (7, "KZN-03", "ПВЗ Азино", "Казань", 55, 25),
-    (8, "KZN-04", "ПВЗ Ново-Савиновский", "Казань", 65, 15),
+    # id, code, name, city, capacity, other_stock, lat, lng
+    # Координаты — приближённые центры районов (публичные карты, погрешность ~0,5 км).
+    # Это данные стенда, а не тариф: они нужны только для выбора ближайшего соседа
+    # при отказе узла и для оценки времени перемещения.
+    (1, "YOL-01", "ПВЗ Центральный", "Йошкар-Ола", 80, 8, 56.6317, 47.8966),
+    (2, "YOL-02", "ПВЗ Дубки", "Йошкар-Ола", 60, 8, 56.6550, 47.9290),
+    (3, "YOL-03", "ПВЗ Сомбатхей", "Йошкар-Ола", 70, 8, 56.6420, 47.8590),
+    (4, "YOL-04", "ПВЗ Заречный", "Йошкар-Ола", 50, 8, 56.6100, 47.9500),
+    (5, "KZN-01", "ПВЗ Баумана", "Казань", 90, 20, 55.7900, 49.1200),
+    (6, "KZN-02", "ПВЗ Горки", "Казань", 60, 10, 55.8300, 49.1300),
+    (7, "KZN-03", "ПВЗ Азино", "Казань", 55, 25, 55.7600, 49.2000),
+    (8, "KZN-04", "ПВЗ Ново-Савиновский", "Казань", 65, 15, 55.8200, 49.1400),
 ]
 
-HUB = (9, "HUB-KZN", "Хаб Казань (заглушка)", "Казань", 0, 0)
+HUB = (9, "HUB-KZN", "Хаб Казань (заглушка)", "Казань", 0, 0, 55.7500, 49.1000)
 
 SELLER_ROWS = [
     (1, "ООО «ТехноДом»", 12.0),
@@ -68,7 +71,7 @@ def seed(session: Session) -> None:
     start = clock.START
     session.add(Clock(id=1, virtual_now=start))
 
-    for pid, code, name, city, capacity, other_stock in PVZ_ROWS:
+    for pid, code, name, city, capacity, other_stock, lat, lng in PVZ_ROWS:
         session.add(
             Pvz(
                 id=pid,
@@ -81,9 +84,11 @@ def seed(session: Session) -> None:
                 is_hub=False,
                 storage_rate_day=float(p("pvz", "storage_rate_day_rub")),
                 op_fee=float(p("pvz", "op_fee_rub")),
+                lat=lat,
+                lng=lng,
             )
         )
-    hid, hcode, hname, hcity, _, _ = HUB
+    hid, hcode, hname, hcity, _, _, hlat, hlng = HUB
     session.add(
         Pvz(
             id=hid,
@@ -96,6 +101,8 @@ def seed(session: Session) -> None:
             is_hub=True,
             storage_rate_day=0.0,
             op_fee=0.0,
+            lat=hlat,
+            lng=hlng,
         )
     )
     session.flush()

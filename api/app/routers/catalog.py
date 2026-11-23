@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .. import storage
 from ..clock import now
-from ..db import get_db
+from ..db import begin_immediate, get_db
 from ..models import Item, Pvz, Seller
 from ..notify import notify
 from ..paging import page
@@ -42,6 +42,7 @@ def get_pvz(pvz_id: int, db: Session = Depends(get_db)):
 @router.post("/pvz/{pvz_id}/disable")
 def disable_pvz(pvz_id: int, db: Session = Depends(get_db)):
     """Вывести точку из строя: блокировка, эвакуация остатков, переадресация заказов."""
+    begin_immediate(db)
     row = db.get(Pvz, pvz_id)
     if row is None:
         raise HTTPException(404, "pvz not found")

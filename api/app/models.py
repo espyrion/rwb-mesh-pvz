@@ -80,6 +80,10 @@ class Pvz(Base):
     is_hub = Column(Boolean, nullable=False, default=False)  # хаб — узел графа, не точка выдачи
     storage_rate_day = Column(Float, nullable=False)
     op_fee = Column(Float, nullable=False)
+    # Приблизительные координаты района (не геодезия): нужны только для выбора
+    # ближайшего соседа при отказе узла, расстояния — по прямой с коэффициентом улиц.
+    lat = Column(Float, nullable=True)
+    lng = Column(Float, nullable=True)
 
 
 class Edge(Base):
@@ -125,6 +129,9 @@ class Item(Base):
     price_rub = Column(Float, nullable=False, default=0.0)
     last_accrued_at = Column(DateTime, nullable=True)
     relocate_alert_sent = Column(Boolean, nullable=False, default=False)
+    # Партия, от которой отделена эта строка при дроблении (split-fallback при отказе
+    # узла): позволяет показать в UI, что части — одно отправление.
+    parent_batch_id = Column(Integer, ForeignKey("item.id"), nullable=True, index=True)
 
 
 class Route(Base):
@@ -137,6 +144,10 @@ class Route(Base):
     total_cost_rub = Column(Float, nullable=False)
     total_hours = Column(Float, nullable=False)
     reason = Column(Text, nullable=False)
+    # Машиночитаемое основание решения: mesh | hub | overflow_to_hub | нет пути.
+    # Текст reason остаётся для человека, reason_code — для UI и проверок.
+    reason_code = Column(String(32), nullable=False, default="")
+    overflow = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False)
 
 

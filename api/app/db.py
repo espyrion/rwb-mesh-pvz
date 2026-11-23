@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 
 from .models import Base
@@ -25,6 +25,21 @@ if DATABASE_URL.startswith("sqlite"):
 
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
+
+
+def begin_immediate(db) -> None:
+    """Захватить блокировку записи SQLite в начале операции.
+
+    В SQLite нет `SELECT … FOR UPDATE`: два параллельных запроса могут прочитать
+    один и тот же остаток и оба пройти проверку. `BEGIN IMMEDIATE` берёт
+    RESERVED-блокировку сразу, поэтому writer'ы выстраиваются в очередь ещё до
+    чтения, а не после (в WAL читатели при этом не блокируются).
+    """
+    if db.get_bind().dialect.name != "sqlite":
+        return
+    if db.in_transaction():
+        return
+    db.execute(text("BEGIN IMMEDIATE"))
 
 
 def get_db():
@@ -68,6 +83,28 @@ def _ensure_schema() -> None:
             conn.exec_driver_sql(
                 'CREATE UNIQUE INDEX IF NOT EXISTS ix_order_public_token ON "order" (public_token)'
             )
+
+        pvz_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(pvz)")}
+        for column, ddl in (
+            ("lat", "ALTER TABLE pvz ADD COLUMN lat FLOAT"),
+            ("lng", "ALTER TABLE pvz ADD COLUMN lng FLOAT"),
+            ("is_hub", "ALTER TABLE pvz ADD COLUMN is_hub BOOLEAN NOT NULL DEFAULT 0"),
+        ):
+            if column not in pvz_cols:
+                conn.exec_driver_sql(ddl)
+
+        item_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(item)")}
+        if "parent_batch_id" not in item_cols:
+            conn.exec_driver_sql("ALTER TABLE item ADD COLUMN parent_batch_id INTEGER REFERENCES item(id)")
+            conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_item_parent_batch_id ON item (parent_batch_id)"
+            )
+
+        route_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(route)")}
+        if "reason_code" not in route_cols:
+            conn.exec_driver_sql("ALTER TABLE route ADD COLUMN reason_code VARCHAR(32) NOT NULL DEFAULT ''")
+        if "overflow" not in route_cols:
+            conn.exec_driver_sql("ALTER TABLE route ADD COLUMN overflow BOOLEAN NOT NULL DEFAULT 0")
     from .models import Order
 
     with SessionLocal() as session:

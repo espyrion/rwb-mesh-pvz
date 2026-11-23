@@ -12,6 +12,16 @@
 Срыв срока: просроченный заказ получает штраф; с долей late_cancel_rate он
 отменяется — цепочка теряет маржу всех сторон и платит обратную логистику по
 коэффициенту peak_surge_multiplier.
+
+Два режима маршрутизации:
+* «наивный mesh» — локальная пара всегда едет местной схемой, загрузка точки
+  ни на что не влияет;
+* «адаптивный mesh с overflow» — если приём заказа поднимает загрузку точки
+  выше network.overflow_utilization_threshold, заказ уходит на магистраль
+  (хаб). Допущение модели: перелив снимает с точки внутригородскую операцию —
+  партию везёт магистраль по расписанию, поэтому операция попадает в
+  пропускную способность хаба, а не в очередь ПВЗ. Хаб в модели не имеет
+  очереди (заглушка магистрали), поэтому перелив не создаёт нового ожидания.
 """
 from __future__ import annotations
 
@@ -38,36 +48,77 @@ def percentile(values: list[float], q: float) -> float:
     return round(ordered[index], 2)
 
 
-def _orders(params: dict, orders: int, p_local: float, seed: int, nodes: list[str]) -> list[dict]:
-    rnd = random.Random(seed)
+def _order_row(params: dict, kind: str, node: str, late_threshold: float) -> dict:
     goods = float(params["scenario_defaults"]["goods_price_rub"])
     cells = float(params["pvz"]["avg_cells_per_order"])
     days = float(params["scenario_defaults"]["storage_days_typical"])
-    late_threshold = float(params["fees"]["late_threshold_hours"])
+    econ = order_economics(params, kind=kind, goods_rub=goods, cells=cells, storage_days=days)
+    return {
+        "node": node,
+        "kind": kind,
+        "route_hours": econ["route"]["hours"],
+        "promise_hours": econ["route"]["hours"],
+        "base_hours": econ["route"]["hours"],
+        "late_threshold": late_threshold,
+        "logistics_rub": econ["route"]["cost_rub"],
+        "storage_rub": econ["storage"]["cost_rub"],
+        "buyer_rub": econ["buyer"]["total_rub"],
+        "goods_rub": econ["gmv_rub"],
+        "chain_rub": econ["chain"]["profit_rub"],
+        "pvz_rub": econ["pvz"]["profit_rub"],
+        "marketplace_rub": econ["marketplace"]["profit_rub"],
+        "seller_rub": econ["seller"]["profit_rub"],
+        "overflow": False,
+        "counted": True,
+    }
 
+
+def _orders(
+    params: dict, orders: int, p_local: float, seed: int, nodes: list[str]
+) -> list[dict]:
+    """Наивный поток: доля локальных пар и точка выбираются равномерно."""
+    rnd = random.Random(seed)
+    late_threshold = float(params["fees"]["late_threshold_hours"])
     rows = []
     for _ in range(orders):
         kind = "mesh" if rnd.random() < p_local else "hub"
         node = rnd.choice(nodes)
-        econ = order_economics(params, kind=kind, goods_rub=goods, cells=cells, storage_days=days)
-        rows.append(
-            {
-                "node": node,
-                "kind": kind,
-                "route_hours": econ["route"]["hours"],
-                "promise_hours": econ["route"]["hours"],
-                "base_hours": econ["route"]["hours"],
-                "late_threshold": late_threshold,
-                "logistics_rub": econ["route"]["cost_rub"],
-                "storage_rub": econ["storage"]["cost_rub"],
-                "buyer_rub": econ["buyer"]["total_rub"],
-                "goods_rub": econ["gmv_rub"],
-                "chain_rub": econ["chain"]["profit_rub"],
-                "pvz_rub": econ["pvz"]["profit_rub"],
-                "marketplace_rub": econ["marketplace"]["profit_rub"],
-                "seller_rub": econ["seller"]["profit_rub"],
-            }
-        )
+        rows.append(_order_row(params, kind, node, late_threshold))
+    return rows
+
+
+def _adaptive_orders(
+    params: dict,
+    orders: int,
+    p_local: float,
+    seed: int,
+    nodes: list[str],
+    threshold: float,
+) -> list[dict]:
+    """Тот же поток, но локальный заказ переливается на хаб при перегрузе точки.
+
+    Поток случайных чисел совпадает с `_orders`, поэтому сравнение режимов идёт
+    на одних и тех же заказах: меняется только решение о схеме доставки.
+    """
+    rnd = random.Random(seed)
+    capacity = int(params["pvz"]["ops_per_day_capacity"])
+    late_threshold = float(params["fees"]["late_threshold_hours"])
+    used = {node: 0 for node in nodes}
+    rows = []
+    for _ in range(orders):
+        kind = "mesh" if rnd.random() < p_local else "hub"
+        node = rnd.choice(nodes)
+        overflow = False
+        if kind == "mesh" and (used[node] + 1) / capacity > threshold:
+            kind = "hub"
+            overflow = True
+        else:
+            used[node] += 1
+        row = _order_row(params, kind, node, late_threshold)
+        row["overflow"] = overflow
+        # Перелив не занимает очередь перегруженной точки: заказ едет магистралью.
+        row["counted"] = not overflow
+        rows.append(row)
     return rows
 
 
@@ -75,7 +126,8 @@ def _node_load(params: dict, rows: list[dict], nodes: list[str]) -> list[dict]:
     capacity = int(params["pvz"]["ops_per_day_capacity"])
     per_node = {node: 0 for node in nodes}
     for row in rows:
-        per_node[row["node"]] += 1
+        if row.get("counted", True):
+            per_node[row["node"]] += 1
     load = []
     for node, ops in per_node.items():
         utilization = ops / capacity
@@ -120,6 +172,96 @@ def queue_load_table(params: dict, *, base_ops: int | None = None) -> list[dict]
     return rows
 
 
+def _summarize(params: dict, rows: list[dict], nodes: list[str]) -> dict:
+    """Свести поток заказов в метрики режима (деньги, сроки, загрузка, ожидание)."""
+    late_cancel_rate = float(params["fees"]["late_cancel_rate"])
+    surge = float(params["fees"]["peak_surge_multiplier"])
+    penalty = float(params["fees"]["late_penalty_rub"])
+    seed_value = int(params["network"]["simulation_seed"])
+    load = _node_load(params, rows, nodes)
+    waits = {item["node"]: item["wait_hours"] for item in load}
+    hours = []
+    hours_by_kind = {"mesh": [], "hub": []}
+    wait_hours: list[float] = []
+    late = 0
+    cancelled = 0
+    penalties = 0.0
+    reverse_costs = 0.0
+    lost_pvz = lost_market = lost_seller = 0.0
+    rnd_cancel = random.Random(seed_value * 1000 + 7)  # соль генератора, не тариф
+    for row in rows:
+        wait = 0.0 if row.get("overflow") else waits[row["node"]]
+        wait_hours.append(wait)
+        total = row["base_hours"] + wait
+        hours.append(total)
+        hours_by_kind[row["kind"]].append(total)
+        if total > row["promise_hours"] + row["late_threshold"]:
+            late += 1
+            penalties += penalty
+            if rnd_cancel.random() < late_cancel_rate:
+                cancelled += 1
+                lost_pvz += row["pvz_rub"]
+                lost_market += row["marketplace_rub"]
+                lost_seller += row["seller_rub"]
+                # Обратная перевозка в пик дороже: коэффициент курьера.
+                reverse_costs += route_cost(params, row["kind"]) * surge
+
+    sum_chain = sum(row["chain_rub"] for row in rows)
+    sum_pvz = sum(row["pvz_rub"] for row in rows)
+    sum_market = sum(row["marketplace_rub"] for row in rows)
+    sum_seller = sum(row["seller_rub"] for row in rows)
+    sum_gmv = sum(row["goods_rub"] for row in rows)
+    marketplace_profit = round(sum_market - penalties - lost_market - reverse_costs, 2)
+    pvz_profit = round(sum_pvz - lost_pvz, 2)
+    seller_profit = round(sum_seller - lost_seller, 2)
+    chain_profit = round(
+        sum_chain - penalties - lost_pvz - lost_market - lost_seller - reverse_costs, 2
+    )
+    overflow_orders = sum(1 for row in rows if row.get("overflow"))
+    return {
+        "mesh_share": round(sum(1 for row in rows if row["kind"] == "mesh") / len(rows), 4)
+        if rows
+        else 0.0,
+        "avg_hours": round(mean(hours), 2) if hours else 0.0,
+        "avg_hours_mesh": round(mean(hours_by_kind["mesh"]), 2) if hours_by_kind["mesh"] else None,
+        "avg_hours_hub": round(mean(hours_by_kind["hub"]), 2) if hours_by_kind["hub"] else None,
+        "avg_wait_hours": round(mean(wait_hours), 2) if wait_hours else 0.0,
+        "p95_hours": percentile(hours, 0.95),
+        "late_orders": late,
+        "late_share": round(late / len(rows), 4) if rows else 0.0,
+        "cancelled_orders": cancelled,
+        "cancelled_share_of_late": round(cancelled / late, 4) if late else 0.0,
+        "late_penalty_rub": round(penalties, 2),
+        "penalties_rub": round(penalties, 2),
+        "reverse_logistics_rub": round(reverse_costs, 2),
+        "lost_margin_rub": round(lost_pvz + lost_market + lost_seller, 2),
+        "cancellation_losses_rub": round(
+            penalties + lost_pvz + lost_market + lost_seller + reverse_costs, 2
+        ),
+        "logistics_rub": round(sum(row["logistics_rub"] for row in rows), 2),
+        "logistics_per_order_rub": round(sum(row["logistics_rub"] for row in rows) / len(rows), 2)
+        if rows
+        else 0.0,
+        "storage_rub": round(sum(row["storage_rub"] for row in rows), 2),
+        "gmv_rub": round(sum_gmv, 2),
+        "buyer_total_rub": round(sum(row["buyer_rub"] for row in rows), 2),
+        "chain_profit_rub": chain_profit,
+        "pvz_profit_rub": pvz_profit,
+        "marketplace_profit_rub": marketplace_profit,
+        "marketplace_margin_pct": round(marketplace_profit / sum_gmv * 100.0, 2) if sum_gmv else 0.0,
+        "pvz_profit_per_order_rub": round(pvz_profit / len(rows), 2) if rows else 0.0,
+        "seller_profit_rub": seller_profit,
+        "seller_margin_pct": round(seller_profit / sum_gmv * 100.0, 2) if sum_gmv else 0.0,
+        "overflow_orders": overflow_orders,
+        "overflow_share": round(overflow_orders / len(rows), 4) if rows else 0.0,
+        "threshold": round(float(params["network"]["overflow_utilization_threshold"]), 4),
+        "nodes": load,
+        "bottlenecks": load[:3],
+        "max_utilization": load[0]["utilization"] if load else 0.0,
+        "overloaded_nodes": sum(1 for item in load if item["utilization"] > 1.0),
+    }
+
+
 def simulate_day(
     params: dict,
     *,
@@ -128,90 +270,38 @@ def simulate_day(
     p_local: float | None = None,
     nodes: list[str] | None = None,
 ) -> dict:
-    """Один день сети: mesh-режим против «только хаб» на том же потоке."""
+    """Один день сети: mesh, «только хаб» и адаптивный mesh с overflow."""
     share = float(
         params["scenario_defaults"]["local_share_pct"] / 100.0 if p_local is None else p_local
     )
     count = int(params["network"]["sensitivity_orders"] if orders is None else orders)
     seed_value = int(params["network"]["simulation_seed"] if seed is None else seed)
     names = list(nodes or node_names(int(params["network"]["nodes"])))
-    late_cancel_rate = float(params["fees"]["late_cancel_rate"])
-    surge = float(params["fees"]["peak_surge_multiplier"])
-    penalty = float(params["fees"]["late_penalty_rub"])
+    threshold = float(params["network"]["overflow_utilization_threshold"])
     result = {"orders": count, "seed": seed_value, "p_local": share, "modes": {}}
     for mode, mode_share in (("mesh", share), ("hub", 0.0)):
         rows = _orders(params, count, mode_share, seed_value, names)
-        load = _node_load(params, rows, names)
-        waits = {item["node"]: item["wait_hours"] for item in load}
-        hours = []
-        hours_by_kind = {"mesh": [], "hub": []}
-        late = 0
-        cancelled = 0
-        penalties = 0.0
-        reverse_costs = 0.0
-        lost_pvz = lost_market = lost_seller = 0.0
-        rnd_cancel = random.Random(seed_value * 1000 + 7)  # соль генератора, не тариф
-        for row in rows:
-            total = row["base_hours"] + waits[row["node"]]
-            hours.append(total)
-            hours_by_kind[row["kind"]].append(total)
-            if total > row["promise_hours"] + row["late_threshold"]:
-                late += 1
-                penalties += penalty
-                if rnd_cancel.random() < late_cancel_rate:
-                    cancelled += 1
-                    lost_pvz += row["pvz_rub"]
-                    lost_market += row["marketplace_rub"]
-                    lost_seller += row["seller_rub"]
-                    # Обратная перевозка в пик дороже: коэффициент курьера.
-                    reverse_costs += route_cost(params, row["kind"]) * surge
-
-        sum_chain = sum(row["chain_rub"] for row in rows)
-        sum_pvz = sum(row["pvz_rub"] for row in rows)
-        sum_market = sum(row["marketplace_rub"] for row in rows)
-        sum_seller = sum(row["seller_rub"] for row in rows)
-        sum_gmv = sum(row["goods_rub"] for row in rows)
-        marketplace_profit = round(sum_market - penalties - lost_market - reverse_costs, 2)
-        pvz_profit = round(sum_pvz - lost_pvz, 2)
-        seller_profit = round(sum_seller - lost_seller, 2)
-        chain_profit = round(
-            sum_chain - penalties - lost_pvz - lost_market - lost_seller - reverse_costs, 2
-        )
-        result["modes"][mode] = {
-            "mesh_share": round(sum(1 for row in rows if row["kind"] == "mesh") / len(rows), 4)
-            if rows
-            else 0.0,
-            "avg_hours": round(mean(hours), 2) if hours else 0.0,
-            "avg_hours_mesh": round(mean(hours_by_kind["mesh"]), 2) if hours_by_kind["mesh"] else None,
-            "avg_hours_hub": round(mean(hours_by_kind["hub"]), 2) if hours_by_kind["hub"] else None,
-            "p95_hours": percentile(hours, 0.95),
-            "late_orders": late,
-            "late_share": round(late / len(rows), 4) if rows else 0.0,
-            "cancelled_orders": cancelled,
-            "cancelled_share_of_late": round(cancelled / late, 4) if late else 0.0,
-            "late_penalty_rub": round(penalties, 2),
-            "penalties_rub": round(penalties, 2),
-            "reverse_logistics_rub": round(reverse_costs, 2),
-            "lost_margin_rub": round(lost_pvz + lost_market + lost_seller, 2),
-            "logistics_rub": round(sum(row["logistics_rub"] for row in rows), 2),
-            "logistics_per_order_rub": round(sum(row["logistics_rub"] for row in rows) / len(rows), 2)
-            if rows
-            else 0.0,
-            "storage_rub": round(sum(row["storage_rub"] for row in rows), 2),
-            "gmv_rub": round(sum_gmv, 2),
-            "buyer_total_rub": round(sum(row["buyer_rub"] for row in rows), 2),
-            "chain_profit_rub": chain_profit,
-            "pvz_profit_rub": pvz_profit,
-            "marketplace_profit_rub": marketplace_profit,
-            "marketplace_margin_pct": round(marketplace_profit / sum_gmv * 100.0, 2) if sum_gmv else 0.0,
-            "pvz_profit_per_order_rub": round(pvz_profit / len(rows), 2) if rows else 0.0,
-            "seller_profit_rub": seller_profit,
-            "seller_margin_pct": round(seller_profit / sum_gmv * 100.0, 2) if sum_gmv else 0.0,
-            "nodes": load,
-            "bottlenecks": load[:3],
-            "max_utilization": load[0]["utilization"] if load else 0.0,
-            "overloaded_nodes": sum(1 for item in load if item["utilization"] > 1.0),
-        }
+        result["modes"][mode] = _summarize(params, rows, names)
+    adaptive_rows = _adaptive_orders(params, count, share, seed_value, names, threshold)
+    result["adaptive"] = _summarize(params, adaptive_rows, names)
+    naive = result["modes"]["mesh"]
+    adaptive = result["adaptive"]
+    result["overflow_delta"] = {
+        "late_orders": naive["late_orders"] - adaptive["late_orders"],
+        "max_utilization": round(naive["max_utilization"] - adaptive["max_utilization"], 4),
+        "cancellation_losses_rub": round(
+            naive["cancellation_losses_rub"] - adaptive["cancellation_losses_rub"], 2
+        ),
+        "logistics_per_order_rub": round(
+            adaptive["logistics_per_order_rub"] - naive["logistics_per_order_rub"], 2
+        ),
+        "marketplace_margin_pct": round(
+            adaptive["marketplace_margin_pct"] - naive["marketplace_margin_pct"], 2
+        ),
+        "avg_wait_hours": round(naive["avg_wait_hours"] - adaptive["avg_wait_hours"], 2),
+        "avg_hours": round(adaptive["avg_hours"] - naive["avg_hours"], 2),
+        "overflow_orders": adaptive["overflow_orders"],
+    }
     result["delta"] = {
         "buyer_rub": round(
             result["modes"]["mesh"]["buyer_total_rub"] - result["modes"]["hub"]["buyer_total_rub"], 2

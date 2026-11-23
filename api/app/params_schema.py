@@ -40,6 +40,10 @@ class Pvz(_Section):
     fixed_cost_day_rub: float = Field(ge=0)
     ops_per_day_capacity: int = Field(gt=0)
     avg_cells_per_order: float = Field(gt=0, le=10)
+    relocation_speed_kmh: float = Field(gt=0, le=120)
+    road_detour_factor: float = Field(ge=1.0, le=3.0)
+    evacuation_capacity_weight: float = Field(ge=0)
+    evacuation_distance_weight: float = Field(ge=0)
 
     @model_validator(mode="after")
     def _target_below_alert(self) -> "Pvz":
@@ -98,6 +102,7 @@ class ScenarioDefaults(_Section):
 
 class Network(_Section):
     nodes: int = Field(gt=0, le=1000)
+    overflow_utilization_threshold: float = Field(gt=0, lt=1)
     overload_delay_hours_per_100pct: float = Field(gt=0)
     queue_cap_pct: float = Field(gt=0, le=100)
     queue_base_ops: int = Field(ge=0)
