@@ -282,6 +282,7 @@ class MoneySideOut(Out):
     costs: dict[str, float] | None = None
     costs_total: float | None = None
     profit_rub: float | None = None
+    margin_pct: float | None = None
 
 
 class BuyerCostOut(Out):
@@ -293,6 +294,7 @@ class BuyerCostOut(Out):
 
 class OrderEconOut(Out):
     kind: str
+    gmv_rub: float | None = None
     route: dict[str, float] | None = None
     storage: dict[str, float] | None = None
     buyer: BuyerCostOut | None = None
@@ -306,19 +308,37 @@ class CompareEconOut(Out):
     buyer_delta_rub: float | None = None
     buyer_delta_pct: float | None = None
     buyer_delta_hours: float | None = None
+    buyer_delta_hours_pct: float | None = None
     buyer_acceptance: dict[str, Any] | None = None
-    marketplace_profit_mesh: float | None = None
-    marketplace_profit_base: float | None = None
     pvz_profit_mesh: float | None = None
     pvz_profit_base: float | None = None
+    pvz_delta_rub: float | None = None
+    pvz_delta_pct: float | None = None
+    marketplace_profit_mesh: float | None = None
+    marketplace_profit_base: float | None = None
+    marketplace_delta_rub: float | None = None
+    marketplace_delta_pct: float | None = None
+    seller_profit_mesh: float | None = None
+    seller_profit_base: float | None = None
+    seller_delta_rub: float | None = None
+    seller_delta_pct: float | None = None
     chain_profit_mesh: float | None = None
     chain_profit_base: float | None = None
+    chain_delta_rub: float | None = None
+    chain_delta_pct: float | None = None
+    chain_more_profitable: bool | None = None
     viable: bool | None = None
 
 
 class OrderPairOut(Out):
     mesh: OrderEconOut
     hub: OrderEconOut
+    compare: CompareEconOut
+
+
+class IntercityPairOut(Out):
+    base: OrderEconOut
+    mesh: OrderEconOut
     compare: CompareEconOut
 
 
@@ -336,8 +356,29 @@ class BreakevenOut(Out):
 
 class ScenarioOut(Out):
     params: dict[str, float]
+    buyer_acceptance: dict[str, float] | None = None
     order: OrderPairOut
+    intercity: IntercityPairOut
     pvz_day: PvzDayOut
     breakeven: BreakevenOut
     storage_breakeven_days: float | None = None
+    sensitivity: list[dict[str, Any]] = Field(default_factory=list)
+    chain_breakeven: dict[str, Any] | None = None
+    queue: list[dict[str, Any]] = Field(default_factory=list)
+    queue_threshold: dict[str, Any] | None = None
+    disclaimer: str | None = None
+
+
+class ReportOut(Out):
+    params: dict[str, Any]
+    buyer_acceptance: dict[str, float] | None = None
+    city: OrderPairOut
+    intercity: IntercityPairOut
+    pvz_day: PvzDayOut
+    breakeven: BreakevenOut
+    storage_breakeven_days: float | None = None
+    sensitivity: list[dict[str, Any]] = Field(default_factory=list)
+    chain_breakeven: dict[str, Any] | None = None
+    queue: list[dict[str, Any]] = Field(default_factory=list)
+    queue_threshold: dict[str, Any] | None = None
     disclaimer: str | None = None

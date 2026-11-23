@@ -9,12 +9,13 @@ meta:
 
 pvz:
   capacity_cells_default: 60          # типовая ёмкость ПВЗ, ячеек
-  storage_rate_day_rub: 5.0           # плата за хранение, ₽/ячейка/день (платит маркетплейс)
+  storage_rate_day_rub: 5.0           # плата за хранение, ₽/ячейка/день (платит продавец, ПВЗ получает через МП)
   op_fee_rub: 25.0                    # вознаграждение ПВЗ за операцию приёмки/выдачи
   mesh_bonus_rub: 15.0                # бонус ПВЗ за заказ, обслуженный без хаба
   long_storage_threshold_days: 21     # порог «длительного хранения», дней
   long_storage_threshold_rub: 600.0   # альтернативный порог по накопленной плате
   relocation_cost_rub: 60.0           # себестоимость межПВЗ-перемещения остатка
+  utilization_target_pct: 80.0        # рабочий целевой уровень загрузки ПВЗ, %
   utilization_alert_pct: 85.0         # предупреждение о загрузке ПВЗ, %
   accurate_stock_bonus_rub: 10.0      # бонус за точность остатков (начисляется в отчёте)
   fixed_cost_day_rub: 1200.0          # условно-постоянные затраты ПВЗ (аренда/ФОТ), ₽/день
@@ -27,20 +28,26 @@ logistics:
   hub_handling_rub: 70.0              # обработка отправления на хабе (заглушка)
   hub_handling_hours: 4.0
   trunk_cost_per_order_rub: 10.5      # магистраль 420 ₽/рейс ÷ 40 отправлений в рейсе
-  trunk_hours: 22.0
+  trunk_hours: 22.0                   # норматив магистрали; при предразмещении остатка не в сроке выдачи
   last_mile_cost_rub: 55.0            # последняя миля хаб→ПВЗ
   last_mile_hours: 4.0
   assemble_cost_rub: 12.0             # сборка заказа на ПВЗ
   acceptance_cost_rub: 8.0            # приёмка единицы товара на ПВЗ
 
 fees:
-  buyer_delivery_fee_local_rub: 119.0 # цена доставки для покупателя, mesh
+  buyer_delivery_fee_local_rub: 129.0 # цена доставки для покупателя, mesh: скидка к хабу 30 ₽
   buyer_delivery_fee_hub_rub: 159.0   # цена доставки для покупателя, через хаб
   commission_pct: 12.0                # комиссия маркетплейса с товара
+  seller_logistics_fee_rub: 60.0      # логистическое удержание с продавца за заказ (pick&pack + доставка до ПВЗ)
   return_window_days: 7               # срок возврата после выдачи
-  return_reverse_fee_rub: 60.0        # удержание с ПВЗ за обратную логистику
-  late_penalty_rub: 50.0              # штраф за нарушение SLA
+  return_reverse_fee_rub: 60.0        # удержание за обратную логистику (с ПВЗ и с продавца при возврате)
+  late_penalty_rub: 50.0              # штраф маркетплейса покупателю за нарушение SLA
   late_threshold_hours: 12.0
+  late_cancel_rate: 0.35              # доля просроченных заказов, которые покупатель отменяет
+  peak_surge_multiplier: 1.25         # коэффициент стоимости обратного курьера в пик
+
+seller:
+  goods_cost_pct: 70.0                # закупочная себестоимость товара, % от цены (допущение)
 
 buyer_acceptance:
   max_cost_increase_pct: 10.0         # граница приемлемого удорожания для покупателя
@@ -50,5 +57,19 @@ scenario_defaults:
   goods_price_rub: 2500.0             # средняя цена товара, ₽
   qty: 1
   storage_days_typical: 3
+  local_share_pct: 62.0               # допущение о доле локальных пар в сети, %
+  pvz_day_ops: 60                     # рабочая загрузка точки для расчёта дня ПВЗ, операций/день
+  pvz_day_mesh_share_pct: 30.0        # доля mesh-заказов в дне ПВЗ для расчёта, %
   return_rate_pct: 6.0
   incident_rate_pct: 2.0
+
+network:
+  nodes: 8                            # число точек в симуляции сети
+  overload_delay_hours_per_100pct: 24.0  # свыше queue_cap: сутки очереди на каждые +100% загрузки
+  queue_cap_pct: 95.0                 # до этого уровня очередь считается по M/M/1, дальше — линейно
+  queue_base_ops: 60                  # базовая загрузка точки для расчёта влияния доп. нагрузки
+  sensitivity_orders: 500             # объём сети для таблицы чувствительности по доле локальных пар
+  simulation_orders: [100, 500, 2000] # прогоны симуляции дня для отчёта и SCALE.md
+  simulation_seed: 42                 # зерно детерминированной симуляции
+  sensitivity_mesh_share_pct: [15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
+  queue_extra_ops: [0, 12, 24, 36, 42, 48, 54, 60]  # доп. нагрузка ПВЗ сверх queue_base_ops

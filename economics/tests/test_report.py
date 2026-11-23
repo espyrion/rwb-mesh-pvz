@@ -28,6 +28,14 @@ def test_report_sections_and_numbers():
     assert "mesh" in text and "viable = True" in text
 
 
+def test_report_file_is_current():
+    """docs/ECON_REPORT.md должен совпадать с выводом build(): руками не правится."""
+    from economics.report import OUT
+
+    assert OUT.exists()
+    assert OUT.read_text(encoding="utf-8") == build()
+
+
 def test_report_is_written():
     from economics.report import main
 
