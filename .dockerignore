@@ -1,0 +1,20 @@
+# Контекст сборки api-образа — корень репозитория (см. docker-compose.yml).
+# В образ попадают только api/ и economics/.
+.git
+.gitignore
+.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+*.db
+*.db-journal
+*.log
+node_modules
+web
+docs
+scripts
+tests
+.local
+README.md
+mesh-pvz.tar.gz
+docker-compose*.yml

@@ -1,6 +1,8 @@
 services:
   api:
-    build: ./api
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     container_name: mesh-api
     ports:
       - "8000:8000"
@@ -13,8 +15,6 @@ services:
       MESH_SELLER_KEY: ${MESH_SELLER_KEY:-demo-seller-key}
       MESH_ADMIN_KEY: ${MESH_ADMIN_KEY:-demo-admin-key}
     volumes:
-      - ./api:/app
-      - ./economics:/app/economics
       - meshdata:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
