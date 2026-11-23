@@ -1,12 +1,36 @@
 """Ёмкость ПВЗ, тарифы хранения, пороги и правило перемещения остатка."""
 from __future__ import annotations
 
+from sqlalchemy import case, func, select, update
 from sqlalchemy.orm import Session
 
 from . import clock, money
 from .config import p
-from .models import Item, Ledger, Pvz
+from .models import Item, Ledger, Order, Pvz
 from .notify import notify
+
+# Статусы, при которых заказ держит остаток зарезервированным.
+ACTIVE_RESERVE_STATUSES = ("created", "routed", "assembled", "rerouted", "in_transit")
+
+
+def reserve_stock(session: Session, item_id: int, qty: int) -> bool:
+    """Атомарно зарезервировать qty единиц остатка.
+
+    Проверка остатка и запись статуса — один условный UPDATE: параллельный заказ
+    либо видит уже списанный резерв (rowcount=0), либо сам забирает остаток.
+    Это защищает от двойного бронирования последней единицы.
+    """
+    reserved = (
+        select(func.coalesce(func.sum(Order.qty), 0))
+        .where(Order.item_id == item_id, Order.status.in_(ACTIVE_RESERVE_STATUSES))
+        .scalar_subquery()
+    )
+    stmt = (
+        update(Item)
+        .where(Item.id == item_id, Item.qty >= qty, Item.qty - reserved >= qty)
+        .values(status=case((Item.status == "stored", "reserved"), else_=Item.status))
+    )
+    return session.execute(stmt).rowcount == 1
 
 
 class CapacityError(Exception):

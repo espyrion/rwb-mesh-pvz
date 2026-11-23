@@ -12,7 +12,7 @@ def _items_at(client, pvz_id):
 
 
 def test_node_down_evacuates_free_stock(client):
-    """Свободные партии уезжают к соседям с наименьшей загрузкой, 60 ₽ за перемещение."""
+    """Свободные партии уезжают к соседям по скору «ёмкость − расстояние», 60 ₽ за перемещение."""
     before = client.get("/api/v1/health/deep").json()
     assert before["status"] == "ok"
 
@@ -29,14 +29,16 @@ def test_node_down_evacuates_free_stock(client):
     assert data["incident"]["status"] == "resolved"
     assert data["incident"]["type"] == "node_down"
 
-    # YOL-04 был наименее загружен (17/50), туда ушёл первый остаток;
-    # затем YOL-03 (28/70) — меньше загрузки остальных.
+    # Скор выбора соседа: свободные ячейки × 1,0 − расстояние × 2,0. У YOL-03
+    # 42 свободные ячейки при 3,34 км (скор 35,3) — выше, чем у YOL-04 (33 ячейки,
+    # 5,28 км, скор 22,4) и YOL-02 (15 ячеек, 4,24 км, скор 6,5), поэтому оба
+    # остатка уходят в YOL-03: сначала 12 ячеек TD-1001, затем 15 ячеек SM-2002.
     targets = {row["sku"]: row["to_pvz_id"] for row in data["evacuated"]}
-    assert targets == {"TD-1001": 4, "SM-2002": 3}
+    assert targets == {"TD-1001": 3, "SM-2002": 3}
 
     assert _pvz(client, 1)["used_cells"] == 8  # остались только чужие партии
-    assert _pvz(client, 3)["used_cells"] == 43
-    assert _pvz(client, 4)["used_cells"] == 29
+    assert _pvz(client, 3)["used_cells"] == 55
+    assert _pvz(client, 4)["used_cells"] == 17
 
     ledger = client.get("/api/v1/ledger", params={"kind": "relocation"}).json()
     assert len(ledger) == 2

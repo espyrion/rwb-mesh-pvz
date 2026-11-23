@@ -5,6 +5,7 @@ import secrets
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from .. import money, routing, storage
@@ -12,7 +13,7 @@ from ..paging import page
 from ..responses import OrderOut
 from ..clock import now
 from ..config import p
-from ..db import get_db
+from ..db import begin_immediate, get_db
 from ..models import Item, ORDER_TRANSITIONS, Order, Pvz, Route
 from ..notify import notify
 from ..schemas import OrderCreate
@@ -29,6 +30,9 @@ def _transition(order: Order, target: str) -> None:
 
 @router.post("/orders", status_code=201)
 def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
+    # Захватываем запись SQLite до чтения остатка: два параллельных заказа не должны
+    # одновременно увидеть одну и ту же последнюю единицу.
+    begin_immediate(db)
     if payload.idempotency_key:
         existing = db.query(Order).filter(Order.idempotency_key == payload.idempotency_key).first()
         if existing:
@@ -67,6 +71,12 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
     comparison = routing.compare(db, src.id, dst.id, payload.accept_latency)
     if not comparison["chosen"]:
         raise HTTPException(409, comparison["reason"])
+
+    # Условный UPDATE: остаток проверяется и резервируется одной операцией.
+    if not storage.reserve_stock(db, item.id, payload.qty):
+        db.expire(item)
+        left = item.qty - reserved_qty(db, item.id)
+        raise HTTPException(409, f"недостаточно остатка: доступно {left}, запрошено {payload.qty}")
 
     route = routing.make_route(db, None, comparison, comparison["chosen"])
     order = Order(
@@ -132,6 +142,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 
 @router.post("/orders/{order_id}/assemble")
 def assemble_order(order_id: int, db: Session = Depends(get_db)):
+    begin_immediate(db)
     order = db.get(Order, order_id)
     if order is None:
         raise HTTPException(404, "order not found")
@@ -207,6 +218,7 @@ def transit_order(order_id: int, db: Session = Depends(get_db)):
 @router.post("/orders/{order_id}/cancel")
 def cancel_order(order_id: int, db: Session = Depends(get_db)):
     """Отмена до выдачи: освобождает резерв и возвращает остаток на ПВЗ-источник."""
+    begin_immediate(db)
     order = db.get(Order, order_id)
     if order is None:
         raise HTTPException(404, "order not found")
@@ -215,12 +227,26 @@ def cancel_order(order_id: int, db: Session = Depends(get_db)):
     if order.status in ("in_transit", "issued", "returned"):
         raise HTTPException(409, f"нельзя отменить заказ в статусе {order.status}")
     _transition(order, "cancelled")
+    was_assembled = order.status == "assembled"
+
+    # Захват статуса одной операцией: параллельная выдача не может «отменить»
+    # уже выданный заказ, а повторная отмена не двигает ячейки дважды.
+    claimed = db.execute(
+        update(Order)
+        .where(Order.id == order.id, Order.status.in_(("routed", "rerouted", "assembled")))
+        .values(status="cancelled")
+    )
+    if claimed.rowcount != 1:
+        db.expire(order)
+        if order.status == "cancelled":
+            return {"order": order_dict(db, order), "idempotent_replay": True}
+        raise HTTPException(409, f"нельзя отменить заказ в статусе {order.status}")
 
     item = db.get(Item, order.item_id)
     src = db.get(Pvz, order.from_pvz)
     dst = db.get(Pvz, order.to_pvz)
     cells = item.cell_size * order.qty
-    if order.status == "assembled":
+    if was_assembled:
         # Заказ уже перевезён на пункт выдачи: возвращаем товар и ячейки обратно.
         try:
             storage.occupy(src, cells)
@@ -261,6 +287,7 @@ def cancel_order(order_id: int, db: Session = Depends(get_db)):
 
 @router.post("/orders/{order_id}/issue")
 def issue_order(order_id: int, db: Session = Depends(get_db)):
+    begin_immediate(db)
     order = db.get(Order, order_id)
     if order is None:
         raise HTTPException(404, "order not found")
@@ -276,6 +303,19 @@ def issue_order(order_id: int, db: Session = Depends(get_db)):
         )
     _transition(order, "issued")
 
+    # Выдача фиксируется условным UPDATE: из двух параллельных запросов статус
+    # сменит ровно один, второй получит rowcount=0 и не спишет остаток повторно.
+    claimed = db.execute(
+        update(Order)
+        .where(Order.id == order.id, Order.status.in_(("assembled", "in_transit")))
+        .values(status="issued")
+    )
+    if claimed.rowcount != 1:
+        db.expire(order)
+        if order.status == "issued":
+            return {"order": order_dict(db, order), "idempotent_replay": True}
+        raise HTTPException(409, f"недопустимый переход статуса {order.status} → issued")
+
     item = db.get(Item, order.item_id)
     route = db.get(Route, order.route_id)
     dst = db.get(Pvz, order.to_pvz)
@@ -283,7 +323,13 @@ def issue_order(order_id: int, db: Session = Depends(get_db)):
     ts = now(db)
 
     money.post_issue(db, order, item, route)
-    item.qty = max(0, item.qty - order.qty)
+    # Последняя единица: списание только при достаточном остатке (qty >= n).
+    consumed = db.execute(
+        update(Item).where(Item.id == item.id, Item.qty >= order.qty).values(qty=Item.qty - order.qty)
+    )
+    if consumed.rowcount != 1:
+        raise HTTPException(409, "остаток уже выдан: списание невозможно")
+    db.refresh(item)
     item.status = "issued" if item.qty == 0 else "stored"
     storage.release(dst, cells)
     order.status = "issued"

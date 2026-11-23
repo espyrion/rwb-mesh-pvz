@@ -30,6 +30,8 @@ def pvz_dict(pvz: Pvz) -> dict:
         "is_hub": pvz.is_hub,
         "storage_rate_day": pvz.storage_rate_day,
         "op_fee": pvz.op_fee,
+        "lat": pvz.lat,
+        "lng": pvz.lng,
     }
 
 
@@ -60,6 +62,7 @@ def item_dict(session: Session, item: Item) -> dict:
         "accepted_at": iso(item.accepted_at),
         "status": item.status,
         "price_rub": item.price_rub,
+        "parent_batch_id": item.parent_batch_id,
     }
 
 
@@ -74,6 +77,8 @@ def route_dict(route: Route | None) -> dict | None:
         "total_cost_rub": route.total_cost_rub,
         "total_hours": route.total_hours,
         "reason": route.reason,
+        "reason_code": route.reason_code,
+        "overflow": bool(route.overflow),
         "created_at": iso(route.created_at),
     }
 
