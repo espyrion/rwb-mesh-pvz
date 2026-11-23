@@ -88,7 +88,7 @@ function mapEdgeSvg(pair) {
   MAP_TIPS[pair.key] = mapTipHtml(pair);
   return `<g class="${cls}" data-tipkey="${pair.key}">
     <path class="edge-hit" d="${path.d}" fill="none" stroke="transparent" stroke-width="18"/>
-    <path class="edge-line" d="${path.d}" fill="none" stroke="${stroke}" stroke-width="${trunk ? 2.1 : 1.35}" stroke-opacity="${trunk ? 0.95 : 0.8}"${dash}/>
+    <path class="edge-line" d="${path.d}" fill="none" stroke="${stroke}" stroke-width="${trunk ? 2.4 : 1.6}" stroke-linecap="round" stroke-opacity="${trunk ? 0.95 : 0.8}"${dash}/>
   </g>`;
 }
 
@@ -196,7 +196,7 @@ function mapSvgHtml() {
   ).join("");
   const routeOverlay = order ? mapRouteOverlay(order.route, "#4f8cff", "arrow-accent") : "";
   const badge = order
-    ? mapChip(128, 40, `${order.code} · ${Math.round(order.route.total_cost_rub)} ₽ · ${order.route.total_hours} ч`, "#4f8cff")
+    ? mapChip(128, 40, `${order.code} · ${Math.round(order.route.total_cost_rub)} ₽ · ${dec(order.route.total_hours)} ч`, "#4f8cff")
     : "";
   return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" role="img" aria-label="Схема сети ПВЗ: узлы, сегменты и маршруты">
     <defs>
@@ -230,6 +230,7 @@ function mapLegendHtml() {
     <span class="lg"><i class="dot" style="background:#34c38f"></i>загрузка &lt; 70%</span>
     <span class="lg"><i class="dot" style="background:#f0b429"></i>70–85%</span>
     <span class="lg"><i class="dot" style="background:#ef6461"></i>≥ 85%</span>
+    <span class="lg"><i class="dot" style="background:#93a0b8"></i>выведена из строя</span>
     <span class="lg"><i class="line"></i>локальный сегмент</span>
     <span class="lg"><i class="dash"></i>магистраль через хаб</span>
     <span class="lg"><i class="wave"></i>маршрут заказа</span>
@@ -267,7 +268,7 @@ function mapPanelHtml() {
          ${node.is_hub
            ? `<div class="list-item small muted">Ячейки не хранит: только перевалка между городами.</div>`
            : `<div class="list-item">
-                <div class="row"><span class="muted small">Заполнено ${node.used_cells} из ${node.capacity_cells} яч.</span><strong>${node.utilization_pct}%</strong></div>
+                <div class="row"><span class="muted small">Заполнено ${node.used_cells} из ${node.capacity_cells} яч.</span><strong>${dec(node.utilization_pct)}%</strong></div>
                 <div class="bar ${node.utilization_pct >= 85 ? "warn" : node.utilization_pct >= 70 ? "mid" : ""}" style="margin-top:8px"><span style="width:${Math.min(100, node.utilization_pct)}%"></span></div>
               </div>
               <div class="list-item small">Свободно <strong>${node.free_cells}</strong> яч. · хранение ${money(node.storage_rate_day)}/яч./день · выдача ${money(node.op_fee)}</div>`}
@@ -281,7 +282,7 @@ function mapPanelHtml() {
     : `<div class="section-title"><h2>Сводка сети</h2></div>
        <div class="list">
          <div class="list-item small">Точек в строю: <strong>${points().filter((row) => row.is_active).length}</strong> из ${points().length}</div>
-         <div class="list-item small">Средняя загрузка: <strong>${avgUtil}%</strong>${busiest ? ` · максимум ${esc(busiest.code)} — ${busiest.utilization_pct}%` : ""}</div>
+         <div class="list-item small">Средняя загрузка: <strong>${dec(avgUtil)}%</strong>${busiest ? ` · максимум ${esc(busiest.code)} — ${dec(busiest.utilization_pct)}%` : ""}</div>
          <div class="list-item small">Открытых инцидентов: <strong>${openIncidents}</strong></div>
          <div class="list-item small muted">Нажмите точку на схеме: покажу загрузку, тарифы и действия «вывести из строя» / «вернуть в строй».</div>
        </div>`;
@@ -295,7 +296,7 @@ function mapPanelHtml() {
       ? `<div class="list mt">
            <div class="list-item">
              <div class="row"><strong>${esc(order.code)}</strong><span class="pill ${esc(order.status)}">${esc(order.status)}</span></div>
-             <div class="muted small">${esc(order.sku || "")} · ${money(order.route.total_cost_rub)} · ${order.route.total_hours} ч</div>
+             <div class="muted small">${esc(order.sku || "")} · ${money(order.route.total_cost_rub)} · ${dec(order.route.total_hours)} ч</div>
              <div class="segments">${segmentsText(order.route)}</div>
            </div>
          </div>`

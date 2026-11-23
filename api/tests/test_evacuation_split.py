@@ -87,3 +87,21 @@ def test_overflow_route_goes_to_hub(client):
     assert order["route"]["reason_code"] == "overflow_to_hub"
     assert order["route"]["overflow"] is True
     assert order["route"]["total_cost_rub"] == 135.5
+
+def test_evacuation_with_unplaced_order_keeps_total_qty(client):
+    """Партия: заказ 20 шт. не влезает ни в одного соседа + свободный хвост 10 шт. — суммарный qty сохраняется."""
+    for pid in (6, 7, 8):  # оставляем в каждом соседе по 12 свободных ячеек
+        row = client.get(f"/api/v1/pvz/{pid}").json()
+        _item(client, f"FILL-{pid}", row["capacity_cells"] - row["used_cells"] - 12, 1, pid)
+    batch = _item(client, "ORD-TAIL", 30, 1, 5)
+    create_order(client, item_id=batch["id"], qty=20, to_pvz=1)
+
+    data = client.post("/api/v1/pvz/5/disable").json()
+
+    rows = _rows(client, "ORD-TAIL")
+    assert sum(row["qty"] for row in rows) == 30
+    stayed = sum(row["qty"] for row in rows if row["stored_pvz_id"] == 5)
+    placed = sum(row["qty"] for row in rows if row["stored_pvz_id"] != 5)
+    assert stayed >= 20  # единицы под неразмещённым заказом остаются на исходной строке
+    assert stayed + placed == 30
+    assert data["unresolved"]
