@@ -2030,6 +2030,20 @@
             "description": "Комиссия маркетплейса, %"
           },
           {
+            "name": "seller_logistics_fee",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 500.0,
+              "minimum": 0.0,
+              "description": "Логистическое удержание с продавца, ₽/заказ",
+              "default": 60.0,
+              "title": "Seller Logistics Fee"
+            },
+            "description": "Логистическое удержание с продавца, ₽/заказ"
+          },
+          {
             "name": "goods",
             "in": "query",
             "required": false,
@@ -2103,6 +2117,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/economics/report": {
+      "get": {
+        "tags": [
+          "economics"
+        ],
+        "summary": "Economics Report",
+        "description": "Тот же расчёт по умолчанию, что в docs/ECON_REPORT.md: город, межгород, очередь, чувствительность.",
+        "operationId": "economics_report_api_v1_economics_report_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOut"
                 }
               }
             }
@@ -2311,6 +2347,17 @@
             ],
             "title": "Buyer Delta Hours"
           },
+          "buyer_delta_hours_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Delta Hours Pct"
+          },
           "buyer_acceptance": {
             "anyOf": [
               {
@@ -2322,28 +2369,6 @@
               }
             ],
             "title": "Buyer Acceptance"
-          },
-          "marketplace_profit_mesh": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Marketplace Profit Mesh"
-          },
-          "marketplace_profit_base": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Marketplace Profit Base"
           },
           "pvz_profit_mesh": {
             "anyOf": [
@@ -2367,6 +2392,116 @@
             ],
             "title": "Pvz Profit Base"
           },
+          "pvz_delta_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pvz Delta Rub"
+          },
+          "pvz_delta_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pvz Delta Pct"
+          },
+          "marketplace_profit_mesh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketplace Profit Mesh"
+          },
+          "marketplace_profit_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketplace Profit Base"
+          },
+          "marketplace_delta_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketplace Delta Rub"
+          },
+          "marketplace_delta_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketplace Delta Pct"
+          },
+          "seller_profit_mesh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seller Profit Mesh"
+          },
+          "seller_profit_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seller Profit Base"
+          },
+          "seller_delta_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seller Delta Rub"
+          },
+          "seller_delta_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seller Delta Pct"
+          },
           "chain_profit_mesh": {
             "anyOf": [
               {
@@ -2388,6 +2523,39 @@
               }
             ],
             "title": "Chain Profit Base"
+          },
+          "chain_delta_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Delta Rub"
+          },
+          "chain_delta_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Delta Pct"
+          },
+          "chain_more_profitable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain More Profitable"
           },
           "viable": {
             "anyOf": [
@@ -2711,6 +2879,26 @@
           "id"
         ],
         "title": "IncidentOut"
+      },
+      "IntercityPairOut": {
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/OrderEconOut"
+          },
+          "mesh": {
+            "$ref": "#/components/schemas/OrderEconOut"
+          },
+          "compare": {
+            "$ref": "#/components/schemas/CompareEconOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base",
+          "mesh",
+          "compare"
+        ],
+        "title": "IntercityPairOut"
       },
       "ItemCreate": {
         "properties": {
@@ -3077,6 +3265,17 @@
               }
             ],
             "title": "Profit Rub"
+          },
+          "margin_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Pct"
           }
         },
         "type": "object",
@@ -3199,6 +3398,17 @@
           "kind": {
             "type": "string",
             "title": "Kind"
+          },
+          "gmv_rub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gmv Rub"
           },
           "route": {
             "anyOf": [
@@ -3845,6 +4055,17 @@
             ],
             "title": "Profit Rub"
           },
+          "margin_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Pct"
+          },
           "ops": {
             "type": "integer",
             "title": "Ops"
@@ -4030,6 +4251,112 @@
         ],
         "title": "RelocateRequest"
       },
+      "ReportOut": {
+        "properties": {
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
+          },
+          "buyer_acceptance": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Acceptance"
+          },
+          "city": {
+            "$ref": "#/components/schemas/OrderPairOut"
+          },
+          "intercity": {
+            "$ref": "#/components/schemas/IntercityPairOut"
+          },
+          "pvz_day": {
+            "$ref": "#/components/schemas/PvzDayOut"
+          },
+          "breakeven": {
+            "$ref": "#/components/schemas/BreakevenOut"
+          },
+          "storage_breakeven_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Breakeven Days"
+          },
+          "sensitivity": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Sensitivity"
+          },
+          "chain_breakeven": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Breakeven"
+          },
+          "queue": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Queue"
+          },
+          "queue_threshold": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Threshold"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "params",
+          "city",
+          "intercity",
+          "pvz_day",
+          "breakeven"
+        ],
+        "title": "ReportOut"
+      },
       "RerouteRequest": {
         "properties": {
           "accept_latency": {
@@ -4144,8 +4471,25 @@
             "type": "object",
             "title": "Params"
           },
+          "buyer_acceptance": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Acceptance"
+          },
           "order": {
             "$ref": "#/components/schemas/OrderPairOut"
+          },
+          "intercity": {
+            "$ref": "#/components/schemas/IntercityPairOut"
           },
           "pvz_day": {
             "$ref": "#/components/schemas/PvzDayOut"
@@ -4164,6 +4508,46 @@
             ],
             "title": "Storage Breakeven Days"
           },
+          "sensitivity": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Sensitivity"
+          },
+          "chain_breakeven": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Breakeven"
+          },
+          "queue": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Queue"
+          },
+          "queue_threshold": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Threshold"
+          },
           "disclaimer": {
             "anyOf": [
               {
@@ -4180,6 +4564,7 @@
         "required": [
           "params",
           "order",
+          "intercity",
           "pvz_day",
           "breakeven"
         ],

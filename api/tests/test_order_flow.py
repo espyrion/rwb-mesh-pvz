@@ -8,7 +8,7 @@ def test_create_order_routes_mesh(client):
     assert order["status"] == "routed"
     assert order["route"]["kind"] == "mesh"
     assert order["route"]["total_cost_rub"] == 90.0
-    assert order["buyer_total_rub"] == 19019.0  # 18900 + 119
+    assert order["buyer_total_rub"] == 19029.0  # 18900 + 129
     item = client.get("/api/v1/items/1").json()
     assert item["reserved_qty"] == 1
     assert item["available_qty"] == 5
@@ -70,8 +70,8 @@ def test_issue_idempotent_and_amounts(client):
     by_party = {}
     for row in first:
         by_party[row["party"]] = round(by_party.get(row["party"], 0.0) + row["amount_rub"], 2)
-    assert by_party["buyer"] == -19019.0
+    assert by_party["buyer"] == -19029.0
     assert by_party["seller"] == 16632.0  # 18900 − 12%
     assert by_party["pvz"] == 40.0  # 25 выдача + 15 mesh-бонус
-    assert by_party["marketplace"] == 2257.0  # 2268 комиссия + 119 доставка − 90 логистика − 40 ПВЗ
+    assert by_party["marketplace"] == 2267.0  # 2268 комиссия + 129 доставка − 90 логистика − 40 ПВЗ
     assert round(sum(by_party.values()), 2) == -90.0

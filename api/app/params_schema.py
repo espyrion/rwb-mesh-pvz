@@ -34,11 +34,18 @@ class Pvz(_Section):
     long_storage_threshold_days: int = Field(ge=1)
     long_storage_threshold_rub: float = Field(gt=0)
     relocation_cost_rub: float = Field(ge=0)
+    utilization_target_pct: float = Field(gt=0, le=100)
     utilization_alert_pct: float = Field(gt=0, le=100)
     accurate_stock_bonus_rub: float = Field(ge=0)
     fixed_cost_day_rub: float = Field(ge=0)
     ops_per_day_capacity: int = Field(gt=0)
     avg_cells_per_order: float = Field(gt=0, le=10)
+
+    @model_validator(mode="after")
+    def _target_below_alert(self) -> "Pvz":
+        if self.utilization_target_pct >= self.utilization_alert_pct:
+            raise ValueError("целевая загрузка ПВЗ должна быть ниже порога предупреждения")
+        return self
 
 
 class Logistics(_Section):
@@ -58,10 +65,13 @@ class Fees(_Section):
     buyer_delivery_fee_local_rub: float = Field(ge=0)
     buyer_delivery_fee_hub_rub: float = Field(ge=0)
     commission_pct: float = Field(ge=0, lt=100)
+    seller_logistics_fee_rub: float = Field(ge=0)
     return_window_days: int = Field(ge=1, le=60)
     return_reverse_fee_rub: float = Field(ge=0)
     late_penalty_rub: float = Field(ge=0)
     late_threshold_hours: float = Field(gt=0)
+    late_cancel_rate: float = Field(ge=0, le=1)
+    peak_surge_multiplier: float = Field(ge=1.0)
 
     @model_validator(mode="after")
     def _hub_not_cheaper_than_local(self) -> "Fees":
@@ -79,8 +89,36 @@ class ScenarioDefaults(_Section):
     goods_price_rub: float = Field(gt=0)
     qty: int = Field(ge=1)
     storage_days_typical: int = Field(ge=0)
+    local_share_pct: float = Field(ge=0, le=100)
+    pvz_day_ops: int = Field(gt=0)
+    pvz_day_mesh_share_pct: float = Field(ge=0, le=100)
     return_rate_pct: float = Field(ge=0, le=100)
     incident_rate_pct: float = Field(ge=0, le=100)
+
+
+class Network(_Section):
+    nodes: int = Field(gt=0, le=1000)
+    overload_delay_hours_per_100pct: float = Field(gt=0)
+    queue_cap_pct: float = Field(gt=0, le=100)
+    queue_base_ops: int = Field(ge=0)
+    sensitivity_orders: int = Field(gt=0)
+    simulation_orders: list[int] = Field(min_length=1)
+    simulation_seed: int = Field(ge=0)
+    sensitivity_mesh_share_pct: list[float] = Field(min_length=1)
+    queue_extra_ops: list[int] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _shares_are_sorted(self) -> "Network":
+        shares = self.sensitivity_mesh_share_pct
+        if any(share < 0 or share > 100 for share in shares) or shares != sorted(shares):
+            raise ValueError("sensitivity_mesh_share_pct: доли в % по возрастанию, в диапазоне 0..100")
+        if any(ops < 0 for ops in self.queue_extra_ops):
+            raise ValueError("queue_extra_ops: дополнительная нагрузка не может быть отрицательной")
+        return self
+
+
+class Seller(_Section):
+    goods_cost_pct: float = Field(ge=0, lt=100)
 
 
 class Params(_Section):
@@ -88,8 +126,10 @@ class Params(_Section):
     pvz: Pvz
     logistics: Logistics
     fees: Fees
+    seller: Seller
     buyer_acceptance: BuyerAcceptance
     scenario_defaults: ScenarioDefaults
+    network: Network
 
     @model_validator(mode="after")
     def _mesh_must_be_cheaper_than_hub(self) -> "Params":

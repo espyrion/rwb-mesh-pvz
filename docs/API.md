@@ -108,7 +108,8 @@ created → routed → assembled → in_transit → issued → returned
 | GET | `/analytics/pvz?pvz_id=&from=&to=` | доходы, удержания, прибыль с вычетом операционных и постоянных затрат, ячейко-дни, ledger ПВЗ |
 | GET | `/analytics/seller?seller_id=&from=&to=` | выручка, комиссия, прибыль, разрез по заказам |
 | GET | `/analytics/summary` | сводка: заказы по статусам, ledger по сторонам, логистика, инциденты |
-| GET | `/economics/scenario?mesh_bonus=&storage_rate=&fixed_cost=&commission_pct=&mesh_share=&ops=&goods=` | калькулятор «что если»: P&L четырёх сторон для mesh и хаба, точка безубыточности ПВЗ. Все параметры необязательны, вне диапазона — 422; считает `economics/scenario.py` поверх `params.yaml` |
+| GET | `/economics/scenario?mesh_bonus=&storage_rate=&fixed_cost=&commission_pct=&seller_logistics_fee=&mesh_share=&ops=&goods=&storage_days=` | калькулятор «что если»: P&L четырёх сторон (ПВЗ, маркетплейс, продавец, покупатель) для города и межгорода, точка безубыточности ПВЗ, чувствительность по доле локальных пар, очередь. Все параметры необязательны и по умолчанию берутся из `params.yaml`, вне диапазона — 422; считает `economics/scenario.py` |
+| GET | `/economics/report` | тот же расчёт по умолчанию, что в `docs/ECON_REPORT.md`: город, межгород, день ПВЗ, чувствительность, очередь |
 
 ## Пример: сквозной заказ
 
