@@ -89,6 +89,13 @@ def _ensure_schema() -> None:
             ("lat", "ALTER TABLE pvz ADD COLUMN lat FLOAT"),
             ("lng", "ALTER TABLE pvz ADD COLUMN lng FLOAT"),
             ("is_hub", "ALTER TABLE pvz ADD COLUMN is_hub BOOLEAN NOT NULL DEFAULT 0"),
+            # Инвентаризация остатков: точность/SLA и слепок последней проверки.
+            ("audit_accuracy_pct", "ALTER TABLE pvz ADD COLUMN audit_accuracy_pct FLOAT NOT NULL DEFAULT 100.0"),
+            ("audit_sla_rating", "ALTER TABLE pvz ADD COLUMN audit_sla_rating VARCHAR(2) NOT NULL DEFAULT 'A'"),
+            ("audit_count", "ALTER TABLE pvz ADD COLUMN audit_count INTEGER NOT NULL DEFAULT 0"),
+            ("last_audit_at", "ALTER TABLE pvz ADD COLUMN last_audit_at DATETIME"),
+            ("last_audit_fingerprint", "ALTER TABLE pvz ADD COLUMN last_audit_fingerprint VARCHAR(64)"),
+            ("last_audit_json", "ALTER TABLE pvz ADD COLUMN last_audit_json TEXT"),
         ):
             if column not in pvz_cols:
                 conn.exec_driver_sql(ddl)

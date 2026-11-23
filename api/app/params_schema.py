@@ -45,10 +45,65 @@ class Pvz(_Section):
     evacuation_capacity_weight: float = Field(ge=0)
     evacuation_distance_weight: float = Field(ge=0)
 
+    # Скоринг размещения SKU: веса нормированных критериев (сумма = 1) и пороги.
+    placement_demand_weight: float = Field(ge=0, le=1)
+    placement_turnover_weight: float = Field(ge=0, le=1)
+    placement_footprint_weight: float = Field(ge=0, le=1)
+    placement_demand_target_per_day: float = Field(gt=0)
+    placement_fast_turnover_days: float = Field(gt=0)
+    placement_slow_turnover_days: float = Field(gt=0)
+    placement_footprint_max_cells: int = Field(gt=1, le=100)
+    placement_score_threshold: float = Field(gt=0, le=100)
+    placement_confidence_span: float = Field(gt=0, le=100)
+    placement_max_expected_days: float = Field(gt=0, le=365)
+    placement_default_demand_per_day: float = Field(gt=0)
+    placement_demand_window_days: int = Field(ge=1, le=365)
+    placement_auto_recommend: bool = False
+
+    # Инвентаризация остатков: сглаживание точности, удержания и границы SLA.
+    audit_accuracy_ema_alpha: float = Field(ge=0, le=1)
+    audit_shortage_penalty_rub: float = Field(ge=0)
+    audit_surplus_penalty_rub: float = Field(ge=0)
+    audit_penalty_cap_rub: float = Field(ge=0)
+    audit_sla_a_pct: float = Field(ge=0, le=100)
+    audit_sla_b_pct: float = Field(ge=0, le=100)
+    audit_sla_c_pct: float = Field(ge=0, le=100)
+    audit_initial_accuracy_pct: float = Field(ge=0, le=100)
+
     @model_validator(mode="after")
     def _target_below_alert(self) -> "Pvz":
         if self.utilization_target_pct >= self.utilization_alert_pct:
             raise ValueError("целевая загрузка ПВЗ должна быть ниже порога предупреждения")
+        return self
+
+    @model_validator(mode="after")
+    def _placement_weights_sum_to_one(self) -> "Pvz":
+        total = self.placement_demand_weight + self.placement_turnover_weight + self.placement_footprint_weight
+        if abs(total - 1.0) > 1e-9:
+            raise ValueError(
+                f"веса скоринга размещения должны давать 1.0 (сейчас {total:.3f}): "
+                "pvz.placement_demand_weight + placement_turnover_weight + placement_footprint_weight"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _placement_turnover_bounds(self) -> "Pvz":
+        if self.placement_fast_turnover_days >= self.placement_slow_turnover_days:
+            raise ValueError(
+                "быстрая оборачиваемость (placement_fast_turnover_days) должна быть меньше мёртвой "
+                "(placement_slow_turnover_days), иначе критерий оборачиваемости вывернут"
+            )
+        if self.placement_max_expected_days < self.placement_slow_turnover_days:
+            raise ValueError(
+                "placement_max_expected_days не может быть меньше placement_slow_turnover_days: "
+                "потолок срока хранения должен покрывать «мёртвую» оборачиваемость"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _audit_sla_thresholds_ordered(self) -> "Pvz":
+        if not (self.audit_sla_a_pct > self.audit_sla_b_pct > self.audit_sla_c_pct):
+            raise ValueError("границы SLA должны убывать: audit_sla_a_pct > audit_sla_b_pct > audit_sla_c_pct")
         return self
 
 

@@ -32,6 +32,11 @@ def pvz_dict(pvz: Pvz) -> dict:
         "op_fee": pvz.op_fee,
         "lat": pvz.lat,
         "lng": pvz.lng,
+        # Контроль точности остатков (аддитивные поля: старые клиенты их игнорируют).
+        "audit_accuracy_pct": pvz.audit_accuracy_pct,
+        "audit_sla_rating": pvz.audit_sla_rating,
+        "audit_count": pvz.audit_count,
+        "last_audit_at": iso(pvz.last_audit_at),
     }
 
 

@@ -84,6 +84,15 @@ class Pvz(Base):
     # ближайшего соседа при отказе узла, расстояния — по прямой с коэффициентом улиц.
     lat = Column(Float, nullable=True)
     lng = Column(Float, nullable=True)
+    # Контроль точности остатков (инвентаризация, POST /pvz/{id}/audit):
+    # сглаженная точность, SLA-рейтинг, счётчик проверок и слепок последней
+    # инвентаризации для идемпотентного повтора того же запроса.
+    audit_accuracy_pct = Column(Float, nullable=False, default=100.0)
+    audit_sla_rating = Column(String(2), nullable=False, default="A")
+    audit_count = Column(Integer, nullable=False, default=0)
+    last_audit_at = Column(DateTime, nullable=True)
+    last_audit_fingerprint = Column(String(64), nullable=True)
+    last_audit_json = Column(Text, nullable=True)
 
 
 class Edge(Base):
@@ -195,7 +204,7 @@ class Incident(Base):
     id = Column(Integer, primary_key=True)
     ts = Column(DateTime, nullable=False, index=True)
     order_id = Column(Integer, ForeignKey("order.id"), nullable=True, index=True)
-    type = Column(String(24), nullable=False)  # node_down | late | no_route
+    type = Column(String(24), nullable=False)  # node_down | late | no_route | stock_mismatch
     description = Column(Text, nullable=False)
     resolved_route_id = Column(Integer, ForeignKey("route.id"), nullable=True)
     status = Column(String(12), nullable=False, default="open", index=True)
