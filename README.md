@@ -193,11 +193,6 @@ python3 scripts/record_demo.py     # то же + docs/demo-backup.mp4 (реал�
 .venv/bin/python scripts/simulate.py --orders 100,500,2000 --write-md docs/SCALE.md
 ```
 
-## Выступление
-
-Слайды (речь — в заметках докладчика), текст с таймингом, план живого демо на 90 секунд
-и ответы на 12 вопросов жюри: `docs/pitch/` — `RWB-Mesh-PVZ-pitch.pptx` и `SPEECH.md`.
-Там же PDF — для проверки вёрстки на чужой машине.
 
 ## Ключевые правила модели
 
