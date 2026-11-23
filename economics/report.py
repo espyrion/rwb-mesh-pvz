@@ -444,9 +444,9 @@ def build() -> str:
    {money(-cmp_city['buyer_delta_rub'])} ₽ меньше и ждёт {hours(mesh['buyer']['hours'])} ч вместо
    {hours(hub['buyer']['hours'])} ч. Цепочка {city_chain_words} на
    {money(mesh['chain']['profit_rub'] - hub['chain']['profit_rub'])} ₽.
-2. Для межгорода схема работает только при предварительном размещении остатка; маркетплейс платит за это
-   {money(abs(cmp_ic['marketplace_delta_rub']))} ₽ магистрали, но остаётся в плюсе, а покупатель и цепочка
-   выигрывают.
+2. Для межгорода схема работает только при предварительном размещении остатка; итог маркетплейса {signed(cmp_ic['marketplace_delta_rub']).replace('-', '−')} ₽
+   (+{money(lg['trunk_cost_per_order_rub'] + cmp_ic['marketplace_delta_rub'])} ₽ экономии города − {money(lg['trunk_cost_per_order_rub'])} ₽ магистраль),
+   а покупатель и цепочка выигрывают.
 3. ПВЗ становится устойчиво выгодным при загрузке от **{city_be} операций/день**; ниже порога схема требует
    субсидии. Рабочий потолок — {money(threshold['target'])}–{money(threshold['alert'])}% мощности по очереди.
 4. Длительное хранение свыше **{money(storage_be)} дней** делает заказ убыточным для продавца — порог и

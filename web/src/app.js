@@ -584,11 +584,11 @@ async function renderRoutes() {
 
   const variant = (data, title) => `
     <div class="card"><h2>${title}</h2>
-      <div class="metric small ${data.available ? "" : "bad"}">${data.available ? money(data.total_cost_rub) + " · " + data.total_hours + " ч" : "недоступен"}</div>
+      <div class="metric small ${data.available ? "" : "bad"}">${data.available ? money(data.total_cost_rub) + " · " + dec(data.total_hours) + " ч" : "недоступен"}</div>
       <div class="segments">${segmentsText(data)}</div>
       ${data.segments && data.segments.length
         ? `<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Сегмент</th><th>Тип</th><th class="num">₽</th><th class="num">ч</th></tr></thead><tbody>${data.segments
-            .map((seg) => `<tr><td>${esc(seg.from_code)} → ${esc(seg.to_code)}</td><td>${esc(kindLabel[seg.kind] || seg.kind)}</td><td class="num">${money(seg.cost_rub)}</td><td class="num">${seg.hours}</td></tr>`)
+            .map((seg) => `<tr><td>${esc(seg.from_code)} → ${esc(seg.to_code)}</td><td>${esc(kindLabel[seg.kind] || seg.kind)}</td><td class="num">${money(seg.cost_rub)}</td><td class="num">${dec(seg.hours)}</td></tr>`)
             .join("")}</tbody></table></div>`
         : `<div class="empty">${esc(data.reason || "")}</div>`}
     </div>`;
@@ -597,7 +597,7 @@ async function renderRoutes() {
       <td>${esc(edge.from_code)} → ${esc(edge.to_code)}</td>
       <td>${esc(kindLabel[edge.kind] || edge.kind)}</td>
       <td class="num">${money(edge.cost_rub)}</td>
-      <td class="num">${edge.hours}</td>
+      <td class="num">${dec(edge.hours)}</td>
       <td>${edge.is_active ? '<span class="pill issued">активен</span>' : '<span class="pill open">отключён</span>'}</td>
       <td><button class="btn ghost small" data-action="${edge.is_active ? "disable-edge" : "enable-edge"}" data-id="${edge.id}">${edge.is_active ? "Отключить" : "Включить"}</button></td>
     </tr>`);
@@ -856,7 +856,7 @@ function pvzDayHtml(data) {
       <div class="bar ${ok ? "" : "warn"} mt"><span style="width:${Math.min(100, load)}%"></span></div>
       <div class="hint">Загрузка точки ${load}% от ${num(day.capacity_ops)} операций</div>
       <p class="mt">Точка выходит в ноль при <strong>${be.ops === null ? "нет данных" : num(be.ops)}</strong> операциях в день${share === null ? "" : ` — ${share}% мощности`}.</p>
-      <div class="hint">Порог хранения ${dec(data.storage_breakeven_days)} дн: дольше — маркетплейс на заказе теряет.</div>
+      <div class="hint">Порог хранения ${dec(data.storage_breakeven_days)} дн: дольше — продавец на заказе теряет.</div>
     </div>
     <div class="card"><h2>Очередь и границы модели</h2>
       <div class="list">
@@ -1040,7 +1040,7 @@ async function demoMakeRoom(rows, threshold, exclude = []) {
     const before = fresh.utilization_pct;
     let moved = 0;
     let parts = 0;
-    const stock = state.items.filter((item) => item.stored_pvz_id === fresh.id && item.available_qty > 0);
+    const stock = state.items.filter((item) => item.status === "stored" && item.stored_pvz_id === fresh.id && item.available_qty > 0);
     for (const item of stock) {
       if (moved >= need) break;
       const dest = pool.find(
@@ -1158,7 +1158,7 @@ const DEMO_RUNNERS = {
     const notes = [];
     if (before < threshold) {
       let fresh = await api(`/pvz/${dst.id}`);
-      if (!fresh.is_active) throw new Error(`${fresh.code} выведена из строя — шаг 2 невозможен`);
+      if (!fresh.is_active) throw new Error(`${fresh.code} выведена из строя — шаг «Пик / overflow 85%» невозможен`);
       const need = Math.ceil((fresh.capacity_cells * threshold) / 100) + 1 - fresh.used_cells;
       // Сначала переносим остатки внутри города: запас ячеек города не растёт.
       let movedCells = 0;
@@ -1241,7 +1241,7 @@ const DEMO_RUNNERS = {
 
   async up() {
     const id = state.demo.ctx.downId || (state.demo.ctx.pair ? state.demo.ctx.pair.dst.id : null);
-    if (!id) throw new Error("сначала выполните шаг 3 — отказ узла");
+    if (!id) throw new Error("сначала выполните шаг 4 — отказ узла");
     const res = await api(`/pvz/${id}/enable`, { method: "POST" });
     const fresh = await api(`/pvz/${id}`);
     const pair = state.demo.ctx.pair || demoPair();

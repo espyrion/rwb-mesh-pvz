@@ -73,7 +73,7 @@ job `contract` в `.github/workflows/ci.yml`.
 | POST | `/api/v1/pvz/{pvz_id}/audit` | `actual{item_id: qty}`, `note`; ответ: `lines[]`, `matched`, `shortage`, `surplus`, `accuracy_pct`, `audit_accuracy_pct`, `sla_rating`, `incident_ids`, `penalty_total_rub`, `idempotent` |
 | GET | `/api/v1/routes/compare` | `chosen`, `reason`, `reason_code`, `overflow`, `load` |
 | GET | `/api/v1/orders/{id}` | `route.reason_code`, `route.overflow` |
-| GET | `/api/v1/catalog` | `parent_batch_id` у партии |
+| GET | `/api/v1/items` | `parent_batch_id` у партии |
 
 `reason_code`: `mesh_same_city`, `mesh_cheapest`, `hub_cheaper`, `mesh_no_hub`, `hub_required`,
 `overflow_to_hub`, `overflow_hub_unavailable`, `no_route`. Полные контракты — `docs/API.md`.

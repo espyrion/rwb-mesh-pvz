@@ -165,7 +165,7 @@ def marketplace_pnl(
     )
     seller_return = float(fees["return_reverse_fee_rub"]) if returned else 0.0
     revenue = {
-        "commission": round(float(goods_rub) * pct / 100.0, 2),
+        "commission": round(float(goods_rub) * ops * pct / 100.0, 2),
         "delivery_fee": round(buyer_delivery_fee(params, kind) * ops, 2),
         "seller_logistics": round(float(fees["seller_logistics_fee_rub"]) * ops, 2),
         "seller_storage": seller_storage,
@@ -212,7 +212,7 @@ def seller_pnl(
     """
     fees = params["fees"]
     pct = float(fees["commission_pct"] if commission_pct is None else commission_pct)
-    commission = round(float(goods_rub) * pct / 100.0, 2)
+    commission = round(float(goods_rub) * qty * pct / 100.0, 2)
     goods_cost = round(
         float(goods_rub) * qty * float(params["seller"]["goods_cost_pct"]) / 100.0, 2
     )

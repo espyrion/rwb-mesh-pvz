@@ -97,7 +97,7 @@ function mapTipHtml(pair) {
   const kind = pair.kind === "trunk" ? "магистраль через хаб" : "локальный сегмент";
   const lines = pair.rows.map((row) => {
     const off = row.is_active ? "" : ' · <span style="color:#ef6461">отключён</span>';
-    return `${esc(row.from_code)} → ${esc(row.to_code)}: ${money(row.cost_rub)} · ${row.hours} ч${off}`;
+    return `${esc(row.from_code)} → ${esc(row.to_code)}: ${money(row.cost_rub)} · ${dec(row.hours)} ч${off}`;
   });
   return `${head}<br><span class="muted">${kind}</span><br>${lines.join("<br>")}`;
 }
@@ -421,4 +421,10 @@ document.addEventListener("mousemove", (event) => {
   const top = Math.min(event.clientY - box.top + 16, box.height - tip.offsetHeight - 8);
   tip.style.left = `${Math.max(4, left)}px`;
   tip.style.top = `${Math.max(4, top)}px`;
+});
+
+document.addEventListener("click", (event) => {
+  const el = event.target.closest("[data-map-action]");
+  if (!el) return;
+  mapAction(el.dataset.mapAction, el.dataset.id ? Number(el.dataset.id) : null);
 });

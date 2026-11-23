@@ -16,9 +16,9 @@
 | `ledger` | денежные начисления | `party` (`pvz`/`marketplace`/`seller`/`buyer`), `party_id`, `amount_rub`, `kind`, `order_id`, `item_id` |
 | `incident` | нештатная ситуация | `type` (`node_down`/`late`/`no_route`/`stock_mismatch`), `order_id`, `edge_id`, `status`, `resolved_route_id` |
 | `notification` | лента событий | `audience` (`pvz`/`seller`), `text`, `payload_json` |
+| `clock` | виртуальное время | `virtual_now` |
 
 > `seller_logistics_fee_rub` (60 ₽) учтён в экономической модели P&L, тогда как транзакционный `ledger` MVP удерживает с продавца только комиссию 12% (упрощение прототипа).
-| `clock` | виртуальное время | `virtual_now` |
 
 Статусы заказа и допустимые переходы:
 

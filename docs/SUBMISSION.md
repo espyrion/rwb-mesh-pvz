@@ -16,7 +16,7 @@ mesh-pvz/
 ```
 
 Актуальная ветка — `master`: все рабочие ветки влиты, последний merge — из
-`fix/final-review-and-ui-polish` (хеш — `git log -1 master`). Push в удалённый репозиторий не выполнялся.
+`fix/final-review-and-ui-polish` (хеш — `git log -1 master`).
 
 ## 2. Как поднять с нуля
 

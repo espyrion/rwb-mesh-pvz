@@ -148,7 +148,7 @@ def make_room(points: list[dict], threshold: float, exclude: set[int] | None = N
         for item in call("/items"):
             if moved >= cells_to_move:
                 break
-            if item["stored_pvz_id"] != target["id"] or item["available_qty"] <= 0:
+            if item.get("status") != "stored" or item["stored_pvz_id"] != target["id"] or item["available_qty"] <= 0:
                 continue
             dest = next(
                 (
@@ -295,7 +295,7 @@ def scenario_peak(pair: tuple[dict, dict]) -> tuple[bool, list[str]]:
     if before < threshold:
         fresh = call(f"/pvz/{target['id']}")
         if not fresh["is_active"]:
-            raise RuntimeError(f"{fresh['code']} выведена из строя — шаг 2 невозможен")
+            raise RuntimeError(f"{fresh['code']} выведена из строя — шаг «Пик / overflow 85%» невозможен")
         need = -(-int(fresh["capacity_cells"] * threshold) // 100) + 1 - fresh["used_cells"]
         # Сначала пробуем довести точку до порога переносом остатков внутри города:
         # так общий запас ячеек в городе не растёт и прогон остаётся повторяемым.
@@ -304,7 +304,7 @@ def scenario_peak(pair: tuple[dict, dict]) -> tuple[bool, list[str]]:
         cities = {point["id"]: point["city"] for point in pvz_list()}
         pool = [
             item for item in call("/items")
-            if item.get("available_qty", 0) > 0
+            if item.get("status") == "stored" and item.get("available_qty", 0) > 0
             and item["stored_pvz_id"] not in (None, fresh["id"])
             and cities.get(item["stored_pvz_id"]) == fresh["city"]
         ]
