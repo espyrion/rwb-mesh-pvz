@@ -229,7 +229,7 @@ function auditResultHtml(entry) {
   return `<div class="grid cols-4 mt">
       <div><h3>Точность сверки</h3><div class="metric small ${d.accuracy_pct >= 100 ? "good" : "bad"}">${dec(d.accuracy_pct)}%</div>
         <div class="hint">до сверки ${dec(d.accuracy_before_pct)}%</div></div>
-      <div><h3>SLA-рейтинг</h3><div class="metric small">${esc(d.sla_rating)}</div><div class="hint">сверок всего ${d.audits_total}</div></div>
+      <div><h3>SLA-рейтинг</h3><div class="metric small"><span class="rating rating-${esc(d.sla_rating)}">${esc(d.sla_rating)}</span></div><div class="hint">сверок всего ${d.audits_total}</div></div>
       <div><h3>Удержания</h3><div class="metric small ${d.penalty_total_rub > 0 ? "bad" : ""}">${money(d.penalty_total_rub)}</div>
         <div class="hint">расхождение ${d.total_delta_units} шт. · ${d.cells_delta} яч.</div></div>
       <div><h3>Совпало</h3><div class="metric small">${d.matched} / ${d.lines.length}</div>
@@ -298,7 +298,7 @@ async function renderPvz() {
       </div>
       <div class="grid cols-3 mt">
         <div><h3>Точность аудита</h3><div class="metric small ${pvz.audit_accuracy_pct === null || pvz.audit_accuracy_pct === undefined ? "" : pvz.audit_accuracy_pct >= 100 ? "good" : "bad"}">${pvz.audit_accuracy_pct === null || pvz.audit_accuracy_pct === undefined ? "нет данных" : dec(pvz.audit_accuracy_pct) + "%"}</div><div class="hint">audit_accuracy_pct · сверок ${pvz.audit_count ?? "нет данных"}</div></div>
-        <div><h3>SLA-рейтинг</h3><div class="metric small">${esc(pvz.audit_sla_rating ?? pvz.sla_rating ?? "нет данных")}</div><div class="hint">audit_sla_rating</div></div>
+        <div><h3>SLA-рейтинг</h3><div class="metric small"><span class="rating rating-${esc(pvz.audit_sla_rating ?? pvz.sla_rating ?? "na")}">${esc(pvz.audit_sla_rating ?? pvz.sla_rating ?? "нет данных")}</span></div><div class="hint">audit_sla_rating</div></div>
         <div><h3>Последняя сверка</h3><div class="metric small">${pvz.last_audit_at ? dt(pvz.last_audit_at) : "нет данных"}</div><div class="hint">last_audit_at</div></div>
       </div>
       <div class="hint">${esc(pvz.code)} · ${esc(pvz.name)} · ${esc(pvz.city)} · тариф ${money(pvz.storage_rate_day)}/ячейка·день, выдача ${money(pvz.op_fee)}
@@ -523,7 +523,7 @@ async function renderSeller() {
     };
     const result = await guard(api("/orders", { method: "POST", body: payload }));
     if (result) {
-      toast(`Заказ ${result.order.code}: ${result.order.route.kind}, ${money(result.order.route.total_cost_rub)}, ${result.order.route.total_hours} ч`, "ok");
+      toast(`Заказ ${result.order.code}: ${result.order.route.kind}, ${money(result.order.route.total_cost_rub)}, ${dec(result.order.route.total_hours)} ч`, "ok");
       await loadCatalog();
       render();
     }
@@ -543,9 +543,9 @@ async function renderOrders() {
     return `<tr>
       <td><strong>${esc(order.code)}</strong><br><span class="muted small">${esc(order.title || "")} × ${order.qty}</span></td>
       <td>${order.from_code} → ${order.to_code}</td>
-      <td>${order.route ? kindLabel[order.route.kind] || order.route.kind : "—"}<br><span class="segments">${segmentsText(order.route)}</span></td>
+      <td>${order.route ? `<span class="pill ${esc(order.route.kind)}">${esc(kindLabel[order.route.kind] || order.route.kind)}</span>` : "—"}<br><span class="segments">${segmentsText(order.route)}</span></td>
       <td class="num">${order.route ? money(order.route.total_cost_rub) : "—"}</td>
-      <td class="num">${order.route ? order.route.total_hours + " ч" : "—"}</td>
+      <td class="num">${order.route ? dec(order.route.total_hours) + " ч" : "—"}</td>
       <td class="num">${money(order.buyer_total_rub)}</td>
       <td>${pill(order.status)}<br><span class="muted small">${dt(order.created_at)}</span></td>
       <td class="inline">${actions.join(" ")}</td>
@@ -973,11 +973,19 @@ document.addEventListener("input", (event) => {
    Кокпит меняет состояние стенда: принимает партию, выводит/возвращает точку,
    создаёт межгородской заказ. */
 const DEMO_STEPS = [
-  { id: "calm", title: "1. Спокойный день", hint: "Внутригородская пара без перегрузки: маршрут идёт по mesh." },
-  { id: "peak", title: "2. Пиковая нагрузка", hint: "Приёмка партии поднимает загрузку точки до порога overflow — маршрут уходит на хаб." },
-  { id: "down", title: "3. Отказ узла", hint: "Точка выводится из строя: эвакуация остатков, переадресация заказов, инцидент." },
-  { id: "up", title: "4. Восстановление", hint: "Точка возвращается в строй; маршрут рассчитывается снова." },
-  { id: "hub", title: "5. Переключение на хаб", hint: "Межгород: локального маршрута нет, работает хаб и магистраль." },
+  { id: "calm", group: "core", title: "1. Городской заказ", hint: "Внутригородская пара без перегрузки: маршрут идёт по mesh, без хаба." },
+  { id: "hub", group: "core", title: "2. Хаб и магистраль", hint: "Межгород: локального маршрута нет, заказ идёт через хаб и магистраль." },
+  { id: "return", group: "core", title: "3. Возврат", hint: "Заказ создаётся, выдаётся и возвращается: обратный маршрут, остаток возвращается на ПВЗ, проводки возврата в ledger." },
+  { id: "down", group: "core", title: "4. Ошибка в логистике / отказ узла", hint: "Точка выводится из строя: эвакуация остатков, переадресация заказов, инцидент." },
+  { id: "storage", group: "core", title: "5. Длительное хранение", hint: "Виртуальные часы идут вперёд до порога хранения: пересчёт, уведомление ПВЗ и перемещение остатка." },
+  { id: "peak", group: "ext", title: "Пик / overflow 85%", hint: "Приёмка партии поднимает загрузку точки до порога overflow — маршрут уходит на хаб." },
+  { id: "up", group: "ext", title: "Восстановление узла", hint: "Точка возвращается в строй после отказа; маршрут рассчитывается снова." },
+];
+/* Порядок «Прогнать все»: пик раньше отказа узла, восстановление — после него. */
+const DEMO_RUN_ORDER = ["calm", "hub", "return", "storage", "peak", "down", "up"];
+const DEMO_GROUPS = [
+  { id: "core", title: "5 обязательных сценариев ТЗ" },
+  { id: "ext", title: "2 расширенных сценария" },
 ];
 
 function demoPair(threshold = null) {
@@ -1069,7 +1077,7 @@ async function demoCleanup() {
     if (item.qty <= 0 || item.available_qty <= 0) continue;
     const sku = item.sku || "";
     const title = item.title || "";
-    if (!(sku.startsWith("PEAK-") || sku.startsWith("HUB-") || /демо-кокпит|Демо-партия/.test(title))) continue;
+    if (!(sku.startsWith("PEAK-") || sku.startsWith("HUB-") || sku.startsWith("RET-") || sku.startsWith("LONG-") || /демо-кокпит|Демо-партия/.test(title))) continue;
     const origin = state.pvz.find((row) => row.id === item.stored_pvz_id);
     if (!origin) continue;
     let remaining = item.available_qty;
@@ -1302,6 +1310,95 @@ const DEMO_RUNNERS = {
       ],
     };
   },
+
+  async ['return']() {
+    const pair = state.demo.ctx.pair || demoPair();
+    if (!pair) throw new Error("нет двух активных ПВЗ в одном городе");
+    const price = await demoGoodsPrice();
+    const item = await api("/items", {
+      method: "POST",
+      body: {
+        sku: `RET-${pair.src.code}-${Date.now().toString().slice(-5)}`,
+        seller_id: state.sellers[0].id,
+        title: "Демо-партия возврата (демо-кокпит)",
+        qty: 1,
+        cell_size: 1,
+        pvz_id: pair.src.id,
+        price_rub: price,
+      },
+    });
+    const created = await api("/orders", { method: "POST", body: { item_id: item.id, qty: 1, to_pvz_id: pair.dst.id } });
+    const order = created.order;
+    await api(`/orders/${order.id}/assemble`, { method: "POST" });
+    if (order.route.kind !== "mesh") await api(`/orders/${order.id}/transit`, { method: "POST" });
+    await api(`/orders/${order.id}/issue`, { method: "POST" });
+    const srcBefore = await api(`/pvz/${pair.src.id}`);
+    const res = await api(`/orders/${order.id}/return`, { method: "POST" });
+    const srcAfter = await api(`/pvz/${pair.src.id}`);
+    const ledger = await api(`/ledger?order_id=${order.id}`);
+    const refunds = ledger.filter((row) => row.kind === "refund");
+    const refundSum = refunds.reduce((sum, row) => sum + row.amount_rub, 0);
+    const back = res.reverse_route;
+    const ok =
+      res.order.status === "returned" &&
+      !!back &&
+      res.item.status === "returned" &&
+      res.item.qty === 1 &&
+      res.item.pvz_id === pair.src.id &&
+      refunds.length > 0;
+    const segments = ((back && back.segments) || []).map((seg) => `${seg.from_code}→${seg.to_code} ${seg.kind}`).join(", ");
+    return {
+      status: ok ? "pass" : "fail",
+      lines: [
+        `заказ ${order.code}: ${pair.src.code} → ${pair.dst.code}, выдан и возвращён, статус ${res.order.status}`,
+        `обратный маршрут: ${back ? `${back.kind}, ${money(back.total_cost_rub)} / ${dec(back.total_hours)} ч` : "нет"}${segments ? " (" + segments + ")" : ""}`,
+        `остаток: партия #${res.item.id} ${res.item.qty} шт., статус ${res.item.status}; занято на ${srcAfter.code}: ${srcBefore.used_cells} → ${srcAfter.used_cells} яч.`,
+        `ledger заказа: ${ledger.length} проводок, возврат покупателю/продавцу (refund) ${refunds.length} шт., сальдо возврата ${money(refundSum)}; итог по заказу ${money(res.ledger)}`,
+      ],
+    };
+  },
+
+  async storage() {
+    const pair = state.demo.ctx.pair || demoPair();
+    const home = pair ? pair.src : points().find((row) => row.is_active && row.free_cells >= 1);
+    if (!home) throw new Error("нет активной точки для демо-партии");
+    const price = await demoGoodsPrice();
+    const item = await api("/items", {
+      method: "POST",
+      body: {
+        sku: `LONG-${home.code}-${Date.now().toString().slice(-5)}`,
+        seller_id: state.sellers[0].id,
+        title: "Демо-партия длительного хранения (демо-кокпит)",
+        qty: 1,
+        cell_size: 1,
+        pvz_id: home.id,
+        price_rub: price,
+      },
+    });
+    const clockBefore = await api("/clock");
+    let advanced = 0;
+    let charged = 0;
+    let alert = null;
+    for (let step = 0; step < 8 && !alert; step += 1) {
+      const result = await api("/clock/advance?days=7", { method: "POST" });
+      advanced += 7;
+      charged += result.charged_total_rub || 0;
+      const notes = await api("/notifications?audience=pvz&limit=200");
+      alert = notes.find((note) => note.payload && note.payload.kind === "long_storage" && note.payload.item_id === item.id) || null;
+    }
+    const clockAfter = await api("/clock");
+    const lines = [
+      `${item.sku} принята на ${home.code}; часы ${dt(clockBefore.virtual_now)} → ${dt(clockAfter.virtual_now)} (+${advanced} дн.), начислено за хранение ${money(charged)}`,
+    ];
+    if (!alert) return { status: "fail", lines: [...lines, "уведомление о длительном хранении не пришло"] };
+    lines.push(`уведомление ПВЗ: ${alert.text}`);
+    const offer = alert.payload.offer;
+    if (!offer) return { status: "fail", lines: [...lines, "предложения о перемещении нет: нет свободной точки в городе"] };
+    const moved = await api(`/items/${item.id}/relocate`, { method: "POST", body: { to_pvz_id: offer.suggested_pvz_id } });
+    const after = await api(`/items/${item.id}`);
+    lines.push(`перемещение ${offer.from_code} → ${offer.suggested_code}: ${moved.relocation ? moved.relocation.cells : offer.cells} яч., стоимость ${money(offer.cost_rub)}; партия теперь на ПВЗ #${after.stored_pvz_id}`);
+    return { status: after.stored_pvz_id === offer.suggested_pvz_id ? "pass" : "fail", lines };
+  },
 };
 
 function demoCount() {
@@ -1314,10 +1411,9 @@ function renderDemo() {
   const prepLines = (state.demo.prep || []).length
     ? `<div class="list mt">${state.demo.prep.map((line) => `<div class="list-item small">${esc(line)}</div>`).join("")}</div>`
     : "";
-  const cards = DEMO_STEPS.map((step) => {
+  const cardFor = (step) => {
     const result = state.demo.steps[step.id];
     const running = state.demo.running === step.id;
-    const status = running ? "running" : result ? result.status : "idle";
     const badge = running
       ? '<span class="badge badge-warn">выполняется…</span>'
       : result
@@ -1326,11 +1422,19 @@ function renderDemo() {
     const lines = result && result.lines && result.lines.length
       ? `<div class="list mt">${result.lines.map((line) => `<div class="list-item small">${esc(line)}</div>`).join("")}</div>`
       : "";
-    return `<div class="demo-step">
+    return `<div class="demo-step ${running ? "running" : result ? result.status : "idle"}">
       <div class="section-title"><h3>${esc(step.title)}</h3>${badge}</div>
       <div class="hint">${esc(step.hint)}</div>
       <button class="btn small mt" data-demo-step="${step.id}" ${state.demo.running ? "disabled" : ""}>Выполнить шаг</button>
       ${lines}
+    </div>`;
+  };
+  const cards = DEMO_GROUPS.map((group) => {
+    const steps = DEMO_STEPS.filter((step) => step.group === group.id);
+    const ok = steps.filter((step) => state.demo.steps[step.id] && state.demo.steps[step.id].status === "pass").length;
+    return `<div class="demo-group">
+      <div class="section-title"><h2 class="demo-group-title">${esc(group.title)}</h2><span class="badge ${ok === steps.length ? "badge-good" : "badge-quiet"}">${ok}/${steps.length}</span></div>
+      <div class="demo-grid">${steps.map(cardFor).join("")}</div>
     </div>`;
   }).join("");
   const logRows = DEMO_STEPS.filter((step) => state.demo.steps[step.id]).flatMap((step) => {
@@ -1342,10 +1446,10 @@ function renderDemo() {
   $("#page").innerHTML = `
     <div class="card">
       <div class="section-title">
-        <h2>Демо-кокпит: пять сценариев на живом API</h2>
+        <h2>Демо-кокпит: 5 обязательных + 2 расширенных сценария на живом API</h2>
         <span class="badge ${done && passed === DEMO_STEPS.length ? "badge-good" : "badge-quiet"}">итог: ${passed}/${DEMO_STEPS.length}</span>
       </div>
-      <div class="hint">Кокпит меняет состояние стенда: принимает демо-партию, выводит и возвращает точку, создаёт межгородской заказ.
+      <div class="hint">Кокпит меняет состояние стенда: принимает демо-партии, оформляет возврат, двигает виртуальные часы, выводит и возвращает точку, создаёт межгородской заказ.
         Все цифры берутся из ответов API, PASS/FAIL считается по фактическим полям ответа.</div>
       ${prepLines}
       <div class="inline mt">
@@ -1354,7 +1458,7 @@ function renderDemo() {
         <span class="muted small">выполнено шагов: ${done} из ${DEMO_STEPS.length}</span>
       </div>
     </div>
-    <div class="demo-grid">${cards}</div>
+    ${cards}
     <div class="card"><h2>Лог различий</h2>
       ${table([{ title: "Шаг" }, { title: "Статус" }, { title: "Что изменилось" }], logRows, "нет данных: запустите шаги")}
     </div>`;
@@ -1396,11 +1500,32 @@ async function runAllDemo() {
   } finally {
     state.demo.running = null;
   }
-  for (const step of DEMO_STEPS) {
+  for (const id of DEMO_RUN_ORDER) {
     if (state.demo.running) break;
-    await runDemoStep(step.id);
+    await runDemoStep(id);
   }
 }
+
+/* ---------- выравнивание чисел в таблицах ---------- */
+const NUMERIC_CELL = /^[−+-]?\d[\d\s\u00a0\u202f]*(,\d+)?\s?(₽|%|ч|дн\.?|шт\.?|яч\.?|км)?$/;
+function alignNumbers() {
+  document.querySelectorAll("#page table").forEach((tbl) => {
+    const rows = Array.from(tbl.tBodies[0] ? tbl.tBodies[0].rows : []);
+    if (!rows.length) return;
+    const head = tbl.tHead ? tbl.tHead.rows[0] : tbl.rows[0];
+    const cols = rows[0].cells.length;
+    for (let c = 0; c < cols; c += 1) {
+      const cells = rows.map((row) => row.cells[c]).filter(Boolean);
+      if (!cells.length || !cells.every((cell) => cell.classList.contains("num") || NUMERIC_CELL.test(cell.textContent.trim()))) continue;
+      cells.forEach((cell) => cell.classList.add("num"));
+      if (head && head.cells[c]) head.cells[c].classList.add("num");
+    }
+  });
+}
+new MutationObserver(() => {
+  clearTimeout(alignNumbers.timer);
+  alignNumbers.timer = setTimeout(alignNumbers, 30);
+}).observe(document.getElementById("page"), { childList: true, subtree: true });
 
 /* ---------- роутинг ---------- */
 const pages = {
@@ -1414,7 +1539,7 @@ const pages = {
   routes: { title: "Маршруты и сеть", subtitle: "mesh против хаба и управление сегментами", render: renderRoutes },
   incidents: { title: "Инциденты", subtitle: "Нештатные ситуации и перевыбор маршрута", render: renderIncidents },
   clock: { title: "Время и уведомления", subtitle: "Виртуальные часы, начисления, лента событий", render: renderClock },
-  demo: { title: "Демо-кокпит", subtitle: "Пять сценариев на живом API: PASS/FAIL и лог различий", render: async () => renderDemo() },
+  demo: { title: "Демо-кокпит", subtitle: "5 обязательных + 2 расширенных сценария на живом API: PASS/FAIL и лог различий", render: async () => renderDemo() },
 };
 
 async function render() {

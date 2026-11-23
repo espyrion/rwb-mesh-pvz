@@ -98,7 +98,7 @@ def row(orders: int, mode: str, data: dict, max_node: dict, share: float) -> str
     mesh_hours = f"{fmt_num(data['avg_hours_mesh'])} ч" if data.get("avg_hours_mesh") is not None else "—"
     hub_hours = f"{fmt_num(data['avg_hours_hub'])} ч" if data.get("avg_hours_hub") is not None else "—"
     return (
-        f"| {orders} | {mode} | {fmt_num(share * 100, 0)}% | {mesh_hours} | {hub_hours} | {fmt_num(data['p95_hours'])} ч "
+        f"| {orders} | {mode} | {fmt_num(0 if mode == 'только хаб' else share * 100, 0)}% | {mesh_hours} | {hub_hours} | {fmt_num(data['p95_hours'])} ч "
         f"| {fmt_money(data['logistics_per_order_rub'])} ₽ | {fmt_money(data['gmv_rub'])} "
         f"| {fmt_num(data['marketplace_margin_pct'], 2)}% | {fmt_money(data['pvz_profit_per_order_rub'])} "
         f"| {data['late_orders']} | {data['cancelled_orders']} "

@@ -233,7 +233,7 @@ def run_audit(session: Session, pvz: Pvz, actual: dict[int, int], note: str = ""
             payload={"kind": "stock_audit", "pvz_id": pvz.id, "penalty_rub": penalty},
         )
 
-    audit_accuracy = 100.0 if counted_units == 0 else 100.0 * (1.0 - mismatch_units / counted_units)
+    audit_accuracy = (0.0 if mismatch_units > 0 else 100.0) if counted_units == 0 else 100.0 * (1.0 - mismatch_units / counted_units)
     audit_accuracy = round(max(0.0, min(100.0, audit_accuracy)), 2)
     alpha = float(p("pvz", "audit_accuracy_ema_alpha"))
     # До первой сверки точку считаем точной (audit_initial_accuracy_pct): EMA нужен
@@ -258,7 +258,7 @@ def run_audit(session: Session, pvz: Pvz, actual: dict[int, int], note: str = ""
         "matched": sum(1 for line in lines if line["status"] == "matched"),
         "shortage": sum(1 for line in lines if line["status"] == "shortage"),
         "surplus": sum(1 for line in lines if line["status"] == "surplus"),
-        "total_delta_units": shortage_units - surplus_units,
+        "total_delta_units": surplus_units - shortage_units,
         "cells_delta": cells_delta_total,
         "incident_ids": incident_ids,
         "penalty_total_rub": penalty,

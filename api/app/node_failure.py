@@ -216,7 +216,7 @@ def _plan_batch(
         tail -= take
 
     allocation = [buckets[cand["pvz"].id] for cand in candidates if cand["pvz"].id in buckets]
-    return allocation, orphan_orders, tail
+    return allocation, orphan_orders, tail + sum(o.qty for o in orphan_orders)
 
 
 def _move_parts(
@@ -668,8 +668,13 @@ def node_down(session: Session, pvz: Pvz, reason: str) -> dict:
         notify(
             session,
             "pvz",
-            f"Эвакуация с {pvz.code}: партия {item.sku} ({needed} яч.) размещена частями: "
-            + ", ".join(f"{plan['pvz'].code} — {plan['qty']} шт." for plan in allocation)
+            f"Эвакуация с {pvz.code}: партия {item.sku} ({needed} яч.) "
+            + (
+                "перемещена целиком: " + allocation[0]["pvz"].code
+                if len(allocation) == 1
+                else "размещена частями: "
+                + ", ".join(f"{plan['pvz'].code} — {plan['qty']} шт." for plan in allocation)
+            )
             + ". Заказы отправляются из новых точек.",
             payload={
                 "kind": "node_failure_relocation",

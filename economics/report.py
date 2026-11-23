@@ -192,7 +192,7 @@ def build() -> str:
 
 Переводы между участниками (комиссия, вознаграждение ПВЗ, хранение, логистическое удержание) **не создают
 прибыли цепочки**: результат цепочки = прибыль ПВЗ + прибыль маркетплейса + прибыль продавца = оплата
-покупателя − внешние затраты логистики − операционные затраты ПВЗ. Это проверяется тестом
+покупателя − внешние затраты логистики − операционные затраты ПВЗ − закупка товара. Это проверяется тестом
 `sum_parties_equal_chain` в `economics/tests/test_model.py` и `test_chain_identity_holds` в API.
 
 **GMV и маржа — разные величины.** GMV — цена товара; маржа маркетплейса считается в процентах от GMV,
@@ -327,8 +327,8 @@ def build() -> str:
 **Покупатель:** дешевле на {money(abs(cmp_ic['buyer_delta_rub']))} ₽ ({pct(cmp_ic['buyer_delta_pct'])}) и быстрее
 на {hours(abs(cmp_ic['buyer_delta_hours']))} ч ({pct(cmp_ic['buyer_delta_hours_pct'])}). **Цепочка**
 {chain_words} на {money(abs(cmp_ic['chain_delta_rub']))} ₽
-({pct(cmp_ic['chain_delta_pct'])}). **Маркетплейс** теряет магистраль
-{money(abs(cmp_ic['marketplace_delta_rub']))} ₽ ({pct(cmp_ic['marketplace_delta_pct'])}), но остаётся в плюсе
+({pct(cmp_ic['chain_delta_pct'])}). **Маркетплейс**: итог
+{signed(cmp_ic['marketplace_delta_rub'])} ₽ ({pct(cmp_ic['marketplace_delta_pct'])}; +{money(lg['trunk_cost_per_order_rub'] + cmp_ic['marketplace_delta_rub'])} ₽ экономии города − {money(lg['trunk_cost_per_order_rub'])} ₽ магистраль), остаётся в плюсе
 {money(intercity['mesh']['marketplace']['profit_rub'])} ₽: это цена предразмещения, а не убыток.
 Условие: остаток должен быть размещён заранее; при его отсутствии схема недоступна и заказ идёт через хаб
 (ограничение явно показывается в UI и API).
@@ -433,6 +433,7 @@ def build() -> str:
 * страховка товара, потери и недостачи сверх удержаний модели;
 * магистральные рейсы как расписание (стоимость консолидирована в пересчёте на заказ);
 * возврат комиссии и цены товара покупателю при возврате (моделируется только обратная логистика);
+* `seller_logistics_fee_rub` (60 ₽) учтён в экономической модели P&L, тогда как транзакционный `ledger` MVP удерживает с продавца только комиссию 12% (упрощение прототипа);
 * клиентское приложение покупателя (интерфейс покупателя — только расчёт стоимости/срока в API).
 
 ## 10. Выводы
@@ -441,7 +442,7 @@ def build() -> str:
    маркетплейс {signed(mesh['marketplace']['profit_rub'] - hub['marketplace']['profit_rub'])} ₽,
    продавец без изменений ({money(mesh['seller']['profit_rub'])} ₽), покупатель платит на
    {money(-cmp_city['buyer_delta_rub'])} ₽ меньше и ждёт {hours(mesh['buyer']['hours'])} ч вместо
-   {hours(hub['buyer']['hours'])} ч. Прибыль цепочки {city_chain_words} на
+   {hours(hub['buyer']['hours'])} ч. Цепочка {city_chain_words} на
    {money(mesh['chain']['profit_rub'] - hub['chain']['profit_rub'])} ₽.
 2. Для межгорода схема работает только при предварительном размещении остатка; маркетплейс платит за это
    {money(abs(cmp_ic['marketplace_delta_rub']))} ₽ магистрали, но остаётся в плюсе, а покупатель и цепочка

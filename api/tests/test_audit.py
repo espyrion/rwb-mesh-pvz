@@ -206,3 +206,17 @@ def test_audit_penalty_is_capped(client):
     assert response.status_code == 200, response.text
     assert response.json()["penalty_total_rub"] == cap
     assert "потолок" in _penalty_rows(client)[0]["note"]
+
+def test_total_delta_sign_matches_line_delta(client):
+    shortage = _audit(client, pvz_id=1, actual={"1": 4}).json()
+    assert shortage["total_delta_units"] == -2  # недостача отрицательна, как line["delta"]
+    surplus = _audit(client, pvz_id=1, actual={"5": 17}).json()
+    assert surplus["total_delta_units"] == 2
+
+
+def test_zero_expected_with_surplus_has_zero_accuracy(client, db):
+    db.query(Item).filter(Item.id == 5).update({"qty": 0})
+    db.commit()
+    data = _audit(client, pvz_id=1, actual={"5": 3}).json()
+    assert data["lines"][0]["delta"] == 3
+    assert data["audit_accuracy_pct"] == 0.0
