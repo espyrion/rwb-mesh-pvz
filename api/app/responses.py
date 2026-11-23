@@ -30,6 +30,75 @@ class PvzOut(Out):
     op_fee: float | None = None
     lat: float | None = None
     lng: float | None = None
+    # Контроль точности остатков: сглаженная точность, SLA-рейтинг, число сверок.
+    audit_accuracy_pct: float | None = None
+    audit_sla_rating: str | None = None
+    audit_count: int | None = None
+    last_audit_at: str | None = None
+
+
+class PlacementComponentOut(Out):
+    id: str
+    label: str | None = None
+    weight: float | None = None
+    raw: float | None = None
+    points: float | None = None
+    max_points: float | None = None
+
+
+class PlacementScoreOut(Out):
+    sku: str
+    qty: int | None = None
+    cell_size: int | None = None
+    cells_total: int | None = None
+    demand_per_day: float | None = None
+    demand_source: str | None = None
+    demand_window_days: int | None = None
+    expected_storage_days: float | None = None
+    expected_storage_cost_rub: float | None = None
+    components: list[PlacementComponentOut] | None = None
+    score: float | None = None
+    threshold: float | None = None
+    recommendation: str | None = None
+    confidence_pct: float | None = None
+    capacity_override: bool | None = None
+    reasons: list[str] | None = None
+    params_used: dict[str, float] | None = None
+
+
+class AuditLineOut(Out):
+    item_id: int
+    sku: str | None = None
+    expected_qty: int | None = None
+    actual_qty: int | None = None
+    delta: int | None = None
+    cell_size: int | None = None
+    cells_delta: int | None = None
+    status: str | None = None
+    incident_id: int | None = None
+
+
+class AuditOut(Out):
+    pvz_id: int
+    code: str | None = None
+    audited_at: str | None = None
+    note: str | None = None
+    lines: list[AuditLineOut] | None = None
+    matched: int | None = None
+    shortage: int | None = None
+    surplus: int | None = None
+    total_delta_units: int | None = None
+    cells_delta: int | None = None
+    incident_ids: list[int] | None = None
+    penalty_total_rub: float | None = None
+    accuracy_pct: float | None = None
+    audit_accuracy_pct: float | None = None
+    accuracy_before_pct: float | None = None
+    sla_rating: str | None = None
+    audits_total: int | None = None
+    used_cells: int | None = None
+    free_cells: int | None = None
+    idempotent: bool | None = None
 
 
 class SellerOut(Out):

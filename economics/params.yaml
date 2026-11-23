@@ -26,6 +26,32 @@ pvz:
   evacuation_capacity_weight: 1.0     # вес одной свободной ячейки в скоре выбора соседа
   evacuation_distance_weight: 2.0     # штраф за км до отказавшего узла в скоре выбора соседа
 
+  # --- Скоринг размещения SKU в ПВЗ (см. docs/API.md, «Скоринг размещения») ---
+  # Score 0..100 = 100 × сумма(вес × нормированный критерий). Веса должны давать 1.0.
+  placement_demand_weight: 0.35       # вес критерия «локальный спрос» в скоре размещения
+  placement_turnover_weight: 0.45     # вес критерия «оборачиваемость» (главный: хранение стоит денег)
+  placement_footprint_weight: 0.20    # вес критерия «габарит партии» (крупный товар ест ёмкость)
+  placement_demand_target_per_day: 4.0  # спрос, при котором критерий спроса даёт полный балл, заказов/день
+  placement_fast_turnover_days: 3.0   # оборачиваемость «быстрая» (полный балл), дней (≈ scenario_defaults.storage_days_typical)
+  placement_slow_turnover_days: 21.0  # оборачиваемость «мёртвая» (ноль баллов), дней (= long_storage_threshold_days)
+  placement_footprint_max_cells: 3    # габарит, при котором критерий габарита обнуляется, ячеек/шт
+  placement_score_threshold: 60.0     # score ≥ порога → mesh_pvz, иначе hub
+  placement_confidence_span: 25.0     # отрыв score от порога (очков) для 100% уверенности
+  placement_max_expected_days: 60.0   # потолок ожидаемого срока хранения при нулевом спросе, дней
+  placement_default_demand_per_day: 1.0  # спрос-допущение, если наблюдений по SKU нет, заказов/день
+  placement_demand_window_days: 14    # окно наблюдения спроса по заказам, дней
+  placement_auto_recommend: false     # авторекомендация при приёмке партии (по умолчанию выключена)
+
+  # --- Инвентаризация остатков (POST /pvz/{id}/audit) ---
+  audit_accuracy_ema_alpha: 0.3       # вес свежей проверки в сглаженной точности остатков (0..1)
+  audit_shortage_penalty_rub: 30.0    # удержание с ПВЗ за единицу недостачи, ₽/шт
+  audit_surplus_penalty_rub: 10.0     # удержание с ПВЗ за единицу излишка, ₽/шт
+  audit_penalty_cap_rub: 200.0        # потолок удержания за одну инвентаризацию, ₽
+  audit_sla_a_pct: 98.0               # граница рейтинга SLA «A», точность остатков %
+  audit_sla_b_pct: 95.0               # граница рейтинга «B», %
+  audit_sla_c_pct: 90.0               # граница рейтинга «C», % (ниже — «D»)
+  audit_initial_accuracy_pct: 100.0   # точность ПВЗ до первой инвентаризации, %
+
 logistics:
   local_delivery_cost_rub: 90.0       # себестоимость локального сегмента ПВЗ→ПВЗ
   local_delivery_hours: 3.0

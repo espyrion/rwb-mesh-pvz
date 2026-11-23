@@ -4,14 +4,21 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
-from .. import storage
+from .. import audit, placement, storage
 from ..clock import now
 from ..db import begin_immediate, get_db
 from ..models import Item, Pvz, Seller
 from ..notify import notify
 from ..paging import page
-from ..responses import ItemOut, LedgerRowOut, PvzOut, SellerOut
-from ..schemas import ItemCreate, RelocateRequest
+from ..responses import (
+    AuditOut,
+    ItemOut,
+    LedgerRowOut,
+    PlacementScoreOut,
+    PvzOut,
+    SellerOut,
+)
+from ..schemas import AuditRequest, ItemCreate, PlacementScoreRequest, RelocateRequest
 from ..serializers import item_dict, pvz_dict, seller_dict
 
 router = APIRouter(tags=["catalog"])
@@ -68,6 +75,65 @@ def enable_pvz(pvz_id: int, db: Session = Depends(get_db)):
     return result
 
 
+@router.post("/pvz/{pvz_id}/audit", response_model=AuditOut)
+def audit_pvz(pvz_id: int, payload: AuditRequest, db: Session = Depends(get_db)):
+    """Инвентаризация остатков ПВЗ: сверка факта, корректировка, инцидент, удержание.
+
+    Роль pvz/admin. Повтор с теми же фактическими данными идемпотентен:
+    возвращает сохранённый результат (idempotent=true) без новых инцидентов и проводок.
+    """
+    begin_immediate(db)
+    pvz = db.get(Pvz, pvz_id)
+    if pvz is None:
+        raise HTTPException(404, "pvz not found")
+    try:
+        result = audit.run_audit(db, pvz, payload.actual, payload.note)
+    except audit.AuditError as exc:
+        db.rollback()
+        raise HTTPException(exc.status_code, exc.detail) from exc
+    db.commit()
+    return result
+
+
+@router.post("/catalog/placement-score", response_model=PlacementScoreOut)
+def placement_score(payload: PlacementScoreRequest, db: Session = Depends(get_db)):
+    """Скоринг размещения SKU: держать партию в ПВЗ города (mesh_pvz) или на хабе.
+
+    Роль seller/admin. Ответ объясним: score, вклад каждого критерия и причины
+    на русском с числами и именами параметров economics/params.yaml.
+    """
+    pvz = None
+    if payload.pvz_id is not None:
+        pvz = db.get(Pvz, payload.pvz_id)
+        if pvz is None:
+            raise HTTPException(404, "pvz not found")
+        if pvz.is_hub:
+            raise HTTPException(422, "хаб — заглушка магистрали: скоринг считается для ПВЗ")
+
+    if payload.demand_per_day is not None:
+        demand = float(payload.demand_per_day)
+        source, window = "operator", None
+    else:
+        demand, source, window = placement.observed_demand(
+            db, payload.sku, payload.city or (pvz.city if pvz else None)
+        )
+
+    try:
+        return placement.score_placement(
+            sku=payload.sku,
+            qty=payload.qty,
+            cell_size=payload.cell_size,
+            demand_per_day=demand,
+            turnover_days=payload.turnover_days,
+            free_cells=(pvz.capacity_cells - pvz.used_cells) if pvz is not None else None,
+            pvz_code=pvz.code if pvz is not None else None,
+            demand_source=source,
+            demand_window_days=window,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @router.get("/sellers", response_model=list[SellerOut])
 def list_sellers(db: Session = Depends(get_db)):
     return [seller_dict(s) for s in db.query(Seller).order_by(Seller.id).all()]
@@ -114,6 +180,9 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     )
     db.add(item)
     db.flush()
+    # Авторекомендация размещения — только при включённом флаге pvz.placement_auto_recommend.
+    # Считается до занятия ячеек: свободные ячейки в причине должны включать эту партию.
+    recommendation = placement.acceptance_recommendation(db, item, pvz)
     storage.occupy(pvz, cells)
     notify(
         db,
@@ -122,7 +191,11 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
         payload={"kind": "acceptance", "item_id": item.id, "pvz_id": pvz.id, "cells": cells},
     )
     db.commit()
-    return item_dict(db, item)
+    data = item_dict(db, item)
+    if recommendation is not None:
+        # Аддитивный блок: при выключенном флаге ответ приёмки не меняется.
+        data["placement"] = recommendation
+    return data
 
 
 @router.get("/items", response_model=list[ItemOut])
