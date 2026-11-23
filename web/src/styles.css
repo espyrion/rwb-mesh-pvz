@@ -211,3 +211,18 @@ label { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
 .map-legend i.dot { width: 10px; height: 10px; border-radius: 50%; }
 .map-legend i.dash { background: repeating-linear-gradient(90deg, #4a5e92 0 4px, transparent 4px 8px); }
 .map-legend i.wave { background: repeating-linear-gradient(90deg, #4f8cff 0 4px, transparent 4px 8px); }
+
+/* ---------- зелёная зона, «что если», скоринг и демо-кокпит ---------- */
+.good { color: var(--good); }
+.bad { color: var(--bad); }
+.econ-status { font-size: 12px; color: var(--muted); }
+.econ-status.busy { color: #e9b949; }
+.econ-status.ok { color: var(--good); }
+.econ-status.bad { color: var(--bad); }
+.badge-warn { color: #2a1d02; background: #e9b949; border-color: #e9b949; }
+.badge-quiet { color: var(--muted); }
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 14px; }
+.demo-step { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.demo-step h3 { margin: 0; font-size: 14px; }
+[aria-busy="true"] { opacity: .55; transition: opacity .15s ease; }
+@media (prefers-reduced-motion: reduce) { [aria-busy="true"] { transition: none; } }
