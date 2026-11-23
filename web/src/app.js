@@ -1164,7 +1164,7 @@ const DEMO_RUNNERS = {
       let movedCells = 0;
       let movedParts = 0;
       const pool = state.items
-        .filter((item) => item.available_qty > 0 && item.stored_pvz_id && item.stored_pvz_id !== dst.id)
+        .filter((item) => item.status === "stored" && item.available_qty > 0 && item.stored_pvz_id && item.stored_pvz_id !== dst.id)
         .filter((item) => (state.pvz.find((point) => point.id === item.stored_pvz_id) || {}).city === fresh.city)
         .sort((a, b) => a.cells - b.cells);
       for (const item of pool) {
