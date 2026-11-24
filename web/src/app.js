@@ -486,6 +486,7 @@ async function renderSeller() {
         <div><h3>Комиссия маркетплейса</h3><div class="metric small bad">−${money(analytics.costs.commission_rub)}</div><div class="hint">${seller.commission_pct}% от товара</div></div>
         <div><h3>Прибыль продавца</h3><div class="metric small ${analytics.profit_rub >= 0 ? "good" : "bad"}">${money(analytics.profit_rub)}</div></div>
       </div>
+      <div class="hint">Операционное нетто в ledger учитывает только комиссию маркетплейса; полная юнит-экономика продавца (с себестоимостью 70%, хранением и логистическим удержанием 60 ₽) — в разделе «Экономика».</div>
     </div>
 
     <div class="grid cols-2">

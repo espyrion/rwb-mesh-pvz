@@ -178,6 +178,21 @@ def assemble_order(order_id: int, db: Session = Depends(get_db)):
         db.add(remainder)
         db.flush()
         item.qty = order.qty
+        # Другие активные заказы той же партии переезжают на остаток вместе со своим резервом,
+        # иначе резерв на строке проданной части превысит её qty (health/deep: degraded).
+        siblings = (
+            db.query(Order)
+            .filter(
+                Order.item_id == item.id,
+                Order.id != order.id,
+                Order.status.in_(storage.ACTIVE_RESERVE_STATUSES),
+            )
+            .all()
+        )
+        for sibling in siblings:
+            sibling.item_id = remainder.id
+        if siblings:
+            remainder.status = "reserved"
     item.stored_pvz_id = dst.id
     item.status = "assembled"
     order.status = "assembled"

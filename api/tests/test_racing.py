@@ -110,3 +110,18 @@ def test_cancel_issued_order_is_rejected(client):
     assert client.get(f"/api/v1/orders/{order_id}").json()["status"] == "issued"
     item_after = [row for row in client.get("/api/v1/items").json() if row["id"] == 1][0]
     assert item_after["qty"] == item_before["qty"]
+
+def test_partial_assemble_keeps_reserve_invariant(client):
+    """Два заказа на одну партию: сборка первого делит партию, резерв второго переезжает на остаток."""
+    item_id = 1
+    qty = client.get(f"/api/v1/items/{item_id}").json()["qty"]
+    assert qty >= 2
+    first = create_order(client, item_id, 1)["order"]["id"]
+    second = create_order(client, item_id, 1)["order"]["id"]
+    assert client.post(f"/api/v1/orders/{first}/assemble").status_code == 200
+    health = client.get("/api/v1/health/deep").json()
+    assert health["status"] == "ok", health
+    assert client.post(f"/api/v1/orders/{second}/assemble").status_code == 200
+    assert client.post(f"/api/v1/orders/{first}/issue").status_code == 200
+    assert client.post(f"/api/v1/orders/{second}/cancel").status_code == 200
+    assert client.get("/api/v1/health/deep").json()["status"] == "ok"

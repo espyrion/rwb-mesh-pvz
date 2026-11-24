@@ -31,6 +31,7 @@ ORDER_STATUSES = (
     "issued",
     "returned",
     "rerouted",
+    "cancelled",
 )
 
 # Разрешённый граф переходов заказа. Проверяется тестами и API.

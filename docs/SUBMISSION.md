@@ -2,6 +2,20 @@
 
 Чек-лист сдачи хакатона: что открыть, как поднять, что показать и где границы решения.
 
+## 0. Навигатор по Приложению 5
+
+| Пункт Приложения 5 | Где в репозитории |
+|---|---|
+| 1. Исходный код | `api/`, `web/`, `economics/`, `scripts/` |
+| 2. Инструкция запуска | `README.md` (быстрый старт), раздел 2 этого файла |
+| 3. Шаблон переменных окружения | `.env.example` |
+| 4. Контейнеризация | `docker-compose.yml`, `api/Dockerfile`, `web/Dockerfile` |
+| 5. Автотесты и CI | `api/tests/`, `economics/tests/`, `.github/workflows/ci.yml` |
+| 6. API-контракт | `docs/API.md`, `docs/openapi.json` |
+| 7. Демонстрационные сценарии | `docs/SCENARIOS.md`, `docs/SCENARIOS_REPORT.md`, `scripts/demo.py` (7/7) |
+| 8. Презентация и речь | `docs/pitch/RWB-Mesh-PVZ-pitch.pptx`, `.pdf`, `docs/pitch/SPEECH.md` |
+| 9. Происхождение данных, backup-видео | `docs/PROVENANCE.md`, `docs/demo-backup.mp4` |
+
 ## 1. Репозиторий и структура
 
 ```
@@ -58,7 +72,7 @@ curl http://localhost:8000/api/v1/health/deep
 Дополнительно: «Маршруты» — сравнение схем и `reason_code`; «Кабинет ПВЗ» — «Скоринг размещения»
 и «Сверка остатков»; «Карта сети» — топология и отказ узла.
 
-Если UI недоступен, `scripts/demo.py` воспроизводит базовые пять шагов (печатает 5/5 и таблицы); возврат и длительное хранение есть только в UI-кокпите.
+Если UI недоступен, `scripts/demo.py` прогоняет 7 сценариев (5 обязательных ТЗ: городской заказ, хаб, возврат, отказ узла, длительное хранение + 2 расширенных: пик 85%, восстановление), печатает 7/7 и таблицы; `--write-report` пишет `docs/SCENARIOS_REPORT.md`.
 
 ## 4. Ключевые числа
 
@@ -87,12 +101,14 @@ curl http://localhost:8000/api/v1/health/deep
 
 | Документ | О чём |
 |---|---|
+| `.env.example` | шаблон переменных (демо-ключи, без секретов) |
 | `README.md` | обзор, быстрый старт, роли, UI, тесты |
 | `docs/ECON_MODEL.md` | модель, допущения, формулы, границы |
 | `docs/ECON_REPORT.md` | расчёты четырёх сторон, чувствительность, пороги (генерируется) |
 | `docs/SCALE.md` | 100/500/2000 заказов: срок, p95, узкие места (генерируется) |
 | `docs/API.md` | эндпоинты, модели, ошибки, идемпотентность |
 | `docs/openapi.json` | машинный контракт, 40 путей |
+| `docs/SCENARIOS_REPORT.md` | фактический прогон `scripts/demo.py` 7/7: ID, статусы, остатки, маршруты, ledger |
 | `docs/SCENARIOS.md` | 6 демо-кейсов (5 автотестов + отмена/трекинг), что проверяет каждый |
 | `docs/REDTEAM.md` | 10 вопросов жюри с ответами и числами |
 | `docs/PILOT.md` | пилот 30 дней: гипотезы, метрики, stop-критерии |
@@ -108,7 +124,7 @@ curl http://localhost:8000/api/v1/health/deep
 
 | Job | Проверка |
 |---|---|
-| `api` (py3.11, 3.12) | `pytest api/tests -q --tb=short`, 134 теста |
+| `api` (py3.11, 3.12) | `pytest api/tests -q --tb=short`, 135 тестов |
 | `economics` | `pytest economics/tests -q --tb=short`, 14 тестов |
 | `web-lint` | `node --check web/src/*.js` |
 | `contract` | перегенерация OpenAPI в `/tmp` и сравнение распарсенного JSON с `docs/openapi.json` |

@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""Демо-кокпит: пять сценариев против запущенного API с PASS/FAIL и итогом.
+"""Демо-кокпит: 7 сценариев (5 обязательных по Приложению 1 п. 4 + 2 расширенных) с PASS/FAIL.
 
 Запуск:
     python3 scripts/demo.py                          # http://localhost:8000
     API_URL=http://localhost:8001 MESH_API_KEY=demo-admin-key python3 scripts/demo.py
+    python3 scripts/demo.py --write-report docs/SCENARIOS_REPORT.md
 
-Сценарии (те же, что в разделе «Демо-кокпит» интерфейса):
-    1. спокойный день        — внутригородской маршрут идёт по mesh без overflow;
-    2. пиковая нагрузка      — приёмка партии поднимает загрузку до порога, маршрут уходит на хаб;
-    3. отказ узла            — disable: эвакуация остатков и переадресация заказов;
-    4. восстановление        — enable: точка снова в строю, маршрут рассчитывается;
-    5. переключение на хаб   — межгород: локального маршрута нет, работает хаб.
+Обязательные:
+    1. городской заказ       — mesh без хаба: приёмка → заказ → сборка → выдача;
+    2. хаб и магистраль      — межгород; хаб и магистраль — заглушки модели, помечены;
+    3. возврат               — создать → собрать → выдать → вернуть: обратный маршрут, остаток, refund;
+    4. отказ узла            — disable: эвакуация, переадресация заказов, инцидент;
+    5. длительное хранение   — приёмка → виртуальные часы > 21 дн → уведомление → перемещение остатка.
+Расширенные:
+    6. пик / overflow 85%    — загрузка у порога, маршрут уходит на хаб;
+    7. восстановление узла   — enable: точка снова в строю.
+Порядок выполнения безопасный: 1, 2, 3, 5, 6 (пик), 4 (отказ), 7 (восстановление).
 
 Только стандартная библиотека. Скрипт идемпотентен и работает на «грязной» базе:
 демо-партии прошлых прогонов выдаются обычным заказом и освобождают ячейки, пиковая
@@ -274,18 +279,6 @@ def cleanup_demo_stock() -> list[str]:
     return notes
 
 
-def scenario_calm(pair: tuple[dict, dict]) -> tuple[bool, list[str]]:
-    source, target = pair
-    row = compare(source, target)
-    ok = row["chosen"] == "mesh" and row["mesh"]["available"] is True and row["overflow"] is False
-    return ok, [
-        f"{row['from']['code']} → {row['to']['code']}: выбрано «{row['chosen']}», причина {row['reason_code']}, overflow={row['overflow']}",
-        route_line(row),
-        f"загрузка: {row['load']['from']['code']} {pct(row['load']['from']['utilization_pct'])}, "
-        f"{row['load']['to']['code']} {pct(row['load']['to']['utilization_pct'])} (порог {pct(row['load']['threshold_pct'])})",
-    ]
-
-
 def scenario_peak(pair: tuple[dict, dict]) -> tuple[bool, list[str]]:
     source, target = pair
     row = compare(source, target)
@@ -355,26 +348,204 @@ def scenario_peak(pair: tuple[dict, dict]) -> tuple[bool, list[str]]:
     ]
 
 
-def scenario_down(pair: tuple[dict, dict]) -> tuple[bool, list[str]]:
-    _, target = pair
+
+# ---------------------------------------------------------------- обязательные сценарии
+
+PARTIES = ("buyer", "pvz", "seller", "marketplace")
+
+
+def ledger_totals() -> dict[str, float]:
+    totals = {party: 0.0 for party in PARTIES}
+    for row in call("/ledger"):
+        totals[row["party"]] = round(totals.get(row["party"], 0.0) + row["amount_rub"], 2)
+    return totals
+
+
+def ledger_text(before: dict, after: dict) -> str:
+    return "; ".join(
+        f"{party}: {money(before[party])} → {money(after[party])}" for party in PARTIES
+    )
+
+
+def accept(point: dict, prefix: str, title_text: str, qty: int = 1) -> dict:
+    return call("/items", "POST", {
+        "sku": unique_sku(f"{prefix}-{point['code']}"),
+        "seller_id": 1,
+        "title": f"Демо-партия ТЗ: {title_text}",
+        "qty": qty,
+        "cell_size": 1,
+        "pvz_id": point["id"],
+        "price_rub": goods_price(),
+    })
+
+
+def stock(item_id: int) -> str:
+    row = call(f"/items/{item_id}")
+    return f"qty {row['qty']}, резерв {row['reserved_qty']}, статус {row['status']}, {row['stored_pvz_code']}"
+
+
+def cells(point_id: int) -> str:
+    row = call(f"/pvz/{point_id}")
+    return f"{row['code']} {row['used_cells']}/{row['capacity_cells']}"
+
+
+def route_facts(order: dict) -> str:
+    route = order["route"]
+    segments = " → ".join(
+        [route["segments"][0]["from_code"]] + [seg["to_code"] for seg in route["segments"]]
+    ) if route["segments"] else "нет данных"
+    return f"{route['kind']} ({route['reason_code']}): {segments}; {money(route['total_cost_rub'])} / {hours(route['total_hours'])}"
+
+
+def scenario_city(pair):
+    source, target = pair
+    item = accept(source, "CITY", "городской заказ")
+    facts = {"Товар": f"id {item['id']}, {item['sku']}"}
+    facts["Остаток до"] = f"{stock(item['id'])}; ячейки {cells(source['id'])}, {cells(target['id'])}"
+    before = ledger_totals()
+    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": target["id"]})["order"]
+    statuses = [order["status"]]
+    for step in ("assemble", "issue"):
+        order = call(f"/orders/{order['id']}/{step}", "POST")["order"]
+        statuses.append(order["status"])
+    after = ledger_totals()
+    facts["Заказ"] = f"id {order['id']}, {order['code']}"
+    facts["Статусы"] = " → ".join(statuses)
+    facts["Маршрут и стоимость"] = route_facts(order) + f"; покупатель платит {money(order['buyer_total_rub'])}"
+    facts["Остаток после"] = f"{stock(item['id'])}; ячейки {cells(source['id'])}, {cells(target['id'])}"
+    facts["Начисления до → после"] = ledger_text(before, after)
+    ok = order["route"]["kind"] == "mesh" and order["status"] == "issued" and not any(
+        seg["kind"] == "hub" for seg in order["route"]["segments"])
+    lines = [f"{k}: {v}" for k, v in facts.items()]
+    return ok, lines, facts
+
+
+def scenario_intercity(pair):
+    source, _ = pair
+    item = accept(source, "HUB", "межгород")
+    dest = next(
+        row for row in pvz_list()
+        if row["is_active"] and not row["is_hub"] and row["city"] != source["city"]
+    )
+    facts = {"Товар": f"id {item['id']}, {item['sku']}"}
+    facts["Остаток до"] = f"{stock(item['id'])}; ячейки {cells(source['id'])}, {cells(dest['id'])}"
+    before = ledger_totals()
+    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": dest["id"]})["order"]
+    statuses = [order["status"]]
+    for step in ("assemble", "transit", "issue"):
+        order = call(f"/orders/{order['id']}/{step}", "POST")["order"]
+        statuses.append(order["status"])
+    after = ledger_totals()
+    facts["Заказ"] = f"id {order['id']}, {order['code']} ({source['code']} → {dest['code']}, {dest['city']})"
+    facts["Статусы"] = " → ".join(statuses)
+    facts["Маршрут и стоимость"] = route_facts(order) + f"; покупатель платит {money(order['buyer_total_rub'])}"
+    facts["Заглушки"] = "хаб и магистраль — параметры модели (economics/params.yaml), не реальный перевозчик"
+    facts["Остаток после"] = f"{stock(item['id'])}; ячейки {cells(source['id'])}, {cells(dest['id'])}"
+    facts["Начисления до → после"] = ledger_text(before, after)
+    ok = order["route"]["kind"] == "hub" and order["status"] == "issued"
+    return ok, [f"{k}: {v}" for k, v in facts.items()], facts
+
+
+def scenario_return(pair):
+    source, target = pair
+    item = accept(source, "RET", "возврат")
+    facts = {"Товар": f"id {item['id']}, {item['sku']}"}
+    facts["Остаток до"] = f"{stock(item['id'])}; ячейки {cells(source['id'])}, {cells(target['id'])}"
+    before = ledger_totals()
+    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": target["id"]})["order"]
+    statuses = [order["status"]]
+    for step in ("assemble", "issue"):
+        order = call(f"/orders/{order['id']}/{step}", "POST")["order"]
+        statuses.append(order["status"])
+    mid = ledger_totals()
+    result = call(f"/orders/{order['id']}/return", "POST")
+    statuses.append(result["order"]["status"])
+    after = ledger_totals()
+    rows = [r for r in call("/ledger") if r["order_id"] == order["id"]]
+    refunds = [r for r in rows if r["kind"] == "refund"]
+    facts["Заказ"] = f"id {order['id']}, {order['code']}"
+    facts["Статусы"] = " → ".join(statuses)
+    facts["Маршрут прямой"] = route_facts(order)
+    facts["Обратный маршрут"] = f"id {result['order'].get('return_route_id')} ({target['code']} → {source['code']})"
+    facts["Остаток после"] = f"{stock(item['id'])}; ячейки {cells(source['id'])}, {cells(target['id'])}"
+    facts["Проводки refund"] = f"{len(refunds)} шт., сумма по сторонам: " + ", ".join(
+        f"{r['party']} {money(r['amount_rub'])}" for r in refunds)
+    facts["Ledger заказа"] = f"{len(rows)} проводок, сумма {money(round(sum(r['amount_rub'] for r in rows), 2))}"
+    facts["Начисления до → после"] = ledger_text(before, after)
+    ok = (
+        result["order"]["status"] == "returned" and result["item"]["qty"] == 1
+        and result["item"]["pvz_id"] == source["id"] and len(refunds) >= 3
+    )
+    return ok, [f"{k}: {v}" for k, v in facts.items()], facts
+
+
+def scenario_storage(pair):
+    source, _ = pair
+    item = accept(source, "STORE", "длительное хранение")
+    threshold = 21
+    facts = {"Товар": f"id {item['id']}, {item['sku']}"}
+    facts["Остаток до"] = f"{stock(item['id'])}; ячейки {cells(source['id'])}"
+    before = ledger_totals()
+    clock_before = call("/clock")["virtual_now"]
+    advance = call("/clock/advance?days=22", "POST")
+    notes = call("/notifications?audience=pvz")
+    alert = next(
+        (n for n in notes
+         if (n.get("payload") or {}).get("kind") == "long_storage" and n["payload"].get("item_id") == item["id"]),
+        None,
+    )
+    facts["Виртуальные часы"] = f"{clock_before} → {advance['virtual_now']} (+22 дн., порог {threshold} дн.)"
+    facts["Начислено хранение"] = f"{money(advance['charged_total_rub'])} по стенду, алертов: {advance['alerts']}"
+    ok = alert is not None and alert["payload"].get("offer") is not None
+    if alert is None:
+        facts["Уведомление"] = "не найдено"
+        return False, [f"{k}: {v}" for k, v in facts.items()], facts
+    offer = alert["payload"]["offer"]
+    facts["Уведомление"] = alert.get("text") or alert.get("message") or "long_storage"
+    moved = call(f"/items/{item['id']}/relocate", "POST", {"to_pvz_id": offer["suggested_pvz_id"]})
+    after = ledger_totals()
+    rel = moved["relocation"]
+    facts["Перемещение"] = f"{offer['from_code']} → {offer['suggested_code']}, {money(rel['cost_rub'])}, {rel['cells']} яч."
+    facts["Остаток после"] = f"{stock(item['id'])}; ячейки {cells(source['id'])}, {cells(offer['suggested_pvz_id'])}"
+    facts["Начисления до → после"] = ledger_text(before, after)
+    facts["Заказ"] = "не требуется (сценарий про остаток)"
+    return ok, [f"{k}: {v}" for k, v in facts.items()], facts
+
+
+STATE: dict = {}
+
+
+def scenario_down(pair):
+    source, target = pair
+    item = accept(target, "FAIL", "отказ узла", qty=2)
+    facts = {"Товар": f"id {item['id']}, {item['sku']}"}
+    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": source["id"]})["order"]
+    STATE["down_order"] = order["id"]
+    facts["Заказ"] = f"id {order['id']}, {order['code']}, статус {order['status']}, {route_facts(order)}"
+    facts["Остаток до"] = f"{stock(item['id'])}; ячейки {cells(target['id'])}"
+    before = ledger_totals()
     result = call(f"/pvz/{target['id']}/disable", "POST")
+    after = ledger_totals()
     fresh = call(f"/pvz/{target['id']}")
+    moved = call(f"/orders/{order['id']}")
     evacuated = result.get("evacuated") or []
     orders = result.get("orders") or []
     unresolved = result.get("unresolved") or []
-    cells = sum(int(part.get("cells") or 0) for part in evacuated)
-    ok = fresh["is_active"] is False and result["pvz"]["is_active"] is False
-    return ok, [
-        f"{result['pvz']['code']}: {'выведена из строя' if not fresh['is_active'] else 'осталась в строю'}"
-        f"{' (уже была выведена)' if result.get('already_down') else ''}",
-        f"эвакуировано партий: {len(evacuated)}, ячеек: {cells}, стоимость перемещений {money(result.get('relocation_total_rub') or 0)}",
-        f"переадресовано заказов: {len(orders)}, не решено: {len(unresolved)}, "
-        f"инцидент {'#' + str(result['incident']['id']) if result.get('incident') else 'нет'}",
-        f"после отказа: занято {fresh['used_cells']} из {fresh['capacity_cells']} ячеек, свободно {fresh['free_cells']}",
-    ]
+    parts = [p for p in call("/items") if p["id"] == item["id"] or p.get("parent_batch_id") == item["id"]]
+    facts["Узел"] = f"{result['pvz']['code']}: {'выведена из строя' if not fresh['is_active'] else 'в строю'}"
+    facts["Эвакуация"] = (
+        f"партий {len(evacuated)}, ячеек {sum(int(x.get('cells') or 0) for x in evacuated)}, "
+        f"{money(result.get('relocation_total_rub') or 0)}"
+    )
+    facts["Переадресация"] = f"заказов {len(orders)}, не решено {len(unresolved)}; статус заказа теперь {moved['status']}"
+    facts["Инцидент"] = f"#{result['incident']['id']}" if result.get("incident") else "нет"
+    facts["Остаток после"] = "; ".join(f"id {p['id']}: qty {p['qty']}, {p['status']}, {p['stored_pvz_code']}" for p in parts) + f"; ячейки {cells(target['id'])}"
+    facts["Начисления до → после"] = ledger_text(before, after)
+    ok = fresh["is_active"] is False and not unresolved and bool(evacuated)
+    return ok, [f"{k}: {v}" for k, v in facts.items()], facts
 
 
-def scenario_up(pair: tuple[dict, dict]) -> tuple[bool, list[str]]:
+def scenario_up(pair):
     source, target = pair
     result = call(f"/pvz/{target['id']}/enable", "POST")
     fresh = call(f"/pvz/{target['id']}")
@@ -382,67 +553,80 @@ def scenario_up(pair: tuple[dict, dict]) -> tuple[bool, list[str]]:
         f"{result['pvz']['code']}: {'вернулась в строй' if fresh['is_active'] else 'не активировалась'}",
         f"занято {fresh['used_cells']} из {fresh['capacity_cells']} ячеек, свободно {fresh['free_cells']}",
     ]
+    order_id = STATE.pop("down_order", None)
+    if order_id:
+        try:
+            call(f"/orders/{order_id}/cancel", "POST")
+            lines.append(f"демо-заказ {order_id} отменён, резерв снят")
+        except RuntimeError as error:
+            lines.append(f"демо-заказ {order_id} не отменён: {error}")
     try:
         row = compare(source, target)
         lines.append(f"маршрут {row['chosen']} ({row['reason_code']}), overflow={row['overflow']}")
-        lines.append(f"стоимость: {route_line(row)}")
+        lines.append(f"стоимость: {route_facts_row(row)}")
     except RuntimeError as error:
         lines.append(f"маршрут не рассчитан: {error}")
-    return fresh["is_active"] is True and result["pvz"]["is_active"] is True, lines
+    return fresh["is_active"] is True and result["pvz"]["is_active"] is True, lines, {}
 
 
-def scenario_hub(pair: tuple[dict, dict]) -> tuple[bool, list[str]]:
-    source, _ = pair
-    active = {row["id"] for row in pvz_list() if row["is_active"]}
-    item = None
-    for row in call("/items"):
-        if row["stored_pvz_id"] in active and row["available_qty"] > 0:
-            item = row
-            break
-    note = ""
-    if item is None:
-        home = next(row for row in pvz_list() if row["id"] == source["id"])
-        item = call("/items", "POST", {
-            "sku": unique_sku(f"HUB-{home['code']}"),
-            "seller_id": 1,
-            "title": "Демо-партия для межгорода",
-            "qty": 1,
-            "cell_size": 1,
-            "pvz_id": home["id"],
-            "price_rub": goods_price(),
-        })
-        note = f"принята демо-партия {item['sku']} на {home['code']}"
-    origin = call(f"/pvz/{item['stored_pvz_id']}")
-    dest = next(
-        row for row in pvz_list()
-        if row["is_active"] and not row["is_hub"] and row["city"] != origin["city"]
-    )
-    order = call("/orders", "POST", {"item_id": item["id"], "qty": 1, "to_pvz_id": dest["id"]})["order"]
-    route = order["route"]
-    segments = ", ".join(f"{seg['from_code']}→{seg['to_code']} {seg['kind']}" for seg in route["segments"])
-    ok = route["kind"] == "hub" and order["status"] in {"routed", "rerouted"}
-    lines = []
-    if note:
-        lines.append(note)
-    lines += [
-        f"заказ {order['code']}: {origin['code']} → {dest['code']} ({dest['city']}), статус {order['status']}",
-        f"маршрут {route['kind']}, причина {route['reason_code']}, {money(route['total_cost_rub'])} / {hours(route['total_hours'])}",
-        f"плечи: {segments or 'нет данных'}",
-        f"покупатель платит {money(order['buyer_total_rub'])}",
-    ]
-    return ok, lines
+def route_facts_row(row: dict) -> str:
+    return route_line(row)
 
 
+def scenario_peak_ext(pair):
+    ok, lines = scenario_peak(pair)
+    return ok, lines, {}
+
+
+# (номер, название, обязательный, функция); порядок выполнения — EXEC_ORDER
 SCENARIOS = [
-    ("1. Спокойный день", scenario_calm),
-    ("2. Пиковая нагрузка", scenario_peak),
-    ("3. Отказ узла", scenario_down),
-    ("4. Восстановление", scenario_up),
-    ("5. Переключение на хаб", scenario_hub),
+    (1, "Городской заказ (mesh без хаба)", True, scenario_city),
+    (2, "Хаб и магистраль (межгород)", True, scenario_intercity),
+    (3, "Возврат", True, scenario_return),
+    (4, "Ошибка в логистике / отказ узла", True, scenario_down),
+    (5, "Длительное хранение", True, scenario_storage),
+    (6, "Пик / overflow 85%", False, scenario_peak_ext),
+    (7, "Восстановление узла", False, scenario_up),
 ]
+EXEC_ORDER = [1, 2, 3, 5, 6, 4, 7]
+
+
+def write_report(path: str, results: dict, health: dict, passed: int) -> None:
+    out = [
+        "# Отчёт о прогоне сценариев ТЗ",
+        "",
+        "Сформирован `scripts/demo.py --write-report` реальным прогоном против API "
+        f"(`{ROOT}`, чистая БД). Все значения взяты из ответов API.",
+        "",
+        f"**Итог: {passed}/{len(SCENARIOS)}** · `GET /api/v1/health/deep` → **{health.get('status')}**",
+        "",
+        "| № | Сценарий | Тип | Результат |",
+        "|---|---|---|---|",
+    ]
+    for num, name, mandatory, _ in SCENARIOS:
+        ok = results[num]["ok"]
+        out.append(f"| {num} | {name} | {'обязательный' if mandatory else 'расширенный'} | {'PASS' if ok else 'FAIL'} |")
+    out.append("")
+    for num, name, mandatory, _ in SCENARIOS:
+        res = results[num]
+        out += [f"## Сценарий {num}. {name} — {'PASS' if res['ok'] else 'FAIL'}", ""]
+        if res["facts"]:
+            out += ["| Параметр | Значение |", "|---|---|"]
+            out += [f"| {k} | {str(v).replace('|', '/')} |" for k, v in res["facts"].items()]
+        else:
+            out += [f"- {line}" for line in res["lines"]]
+        out.append("")
+    out += ["## Проверка инвариантов", ""]
+    out += [f"- {c['name']}: {'ok' if c['ok'] else 'НАРУШЕНО'} ({c['detail']})" for c in health.get("checks", [])]
+    out.append("")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(out))
 
 
 def main() -> int:
+    report_path = None
+    if "--write-report" in sys.argv:
+        report_path = sys.argv[sys.argv.index("--write-report") + 1]
     try:
         with urllib.request.urlopen(ROOT + "/health", timeout=10) as response:
             health = json.loads(response.read().decode())
@@ -458,29 +642,36 @@ def main() -> int:
     for note in stand_notes:
         print(f"  подготовка стенда: {note}")
 
-    passed = 0
-    failed: list[str] = []
-    for index, (name, runner) in enumerate(SCENARIOS, start=1):
-        title(f"СЦЕНАРИЙ {name}")
+    by_num = {num: (name, mandatory, runner) for num, name, mandatory, runner in SCENARIOS}
+    results: dict = {}
+    for num in EXEC_ORDER:
+        name, mandatory, runner = by_num[num]
+        title(f"СЦЕНАРИЙ {num}. {name}" + ("" if mandatory else " (расширенный)"))
         try:
-            ok, lines = runner(pair)
+            ok, lines, facts = runner(pair)
         except Exception as error:  # noqa: BLE001
-            ok, lines = False, [f"исключение: {error}"]
-        status = "PASS" if ok else "FAIL"
-        print(f"  [{index}/{len(SCENARIOS)}] {name}: {status}")
+            ok, lines, facts = False, [f"исключение: {error}"], {}
+        results[num] = {"ok": ok, "lines": lines, "facts": facts}
+        print(f"  [{num}/{len(SCENARIOS)}] {name}: {'PASS' if ok else 'FAIL'}")
         for line in lines:
             print(f"      {line}")
-        if ok:
-            passed += 1
-        else:
-            failed.append(name)
 
+    passed = sum(1 for r in results.values() if r["ok"])
+    failed = [by_num[n][0] for n in sorted(results) if not results[n]["ok"]]
+    try:
+        deep = call("/health/deep")
+    except RuntimeError as error:
+        deep = {"status": f"ошибка: {error}", "checks": []}
     title("ИТОГ")
     print(f"  итог: {passed}/{len(SCENARIOS)}")
+    print(f"  health/deep: {deep.get('status')}")
     if failed:
         print("  провалено: " + ", ".join(failed))
     print(f"  интерфейс: {WEB}/#demo · ссылка покупателя: {WEB}/?track=<token заказа>")
-    return 0 if not failed else 2
+    if report_path:
+        write_report(report_path, results, deep, passed)
+        print(f"  отчёт: {report_path}")
+    return 0 if not failed and deep.get("status") == "ok" else 2
 
 
 if __name__ == "__main__":
