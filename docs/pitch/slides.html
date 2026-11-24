@@ -36,7 +36,7 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
 .win .bar { height: 28px; flex: none; background: #1B1E2B; display: flex; align-items: center; gap: 6px; padding: 0 12px; }
 .win .bar i { width: 9px; height: 9px; border-radius: 50%; background: #4B5563; display: block; }
 .win .bar span { margin-left: 12px; font-size: 11px; color: #9CA3AF; background: #0B0D14; border-radius: 6px; padding: 2px 40px; }
-.win img { display: block; width: 100%; flex: 1; min-height: 0; object-fit: cover; object-position: top left; }
+.win img { display: block; width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: center; background: #0d1220; }
 .num { flex: none; width: 32px; height: 32px; border-radius: 50%; background: #F5ECF5; color: #7B1E7A; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 15px; }
 .item { display: flex; gap: 16px; align-items: flex-start; }
 .item b { display: block; font-size: 18px; margin-bottom: 4px; } .item p { font-size: 15px; color: #6B7280; line-height: 1.4; }
@@ -87,7 +87,7 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
     </div>
     <div class="card" style="width:340px;background:#111827;border-color:#111827;color:#fff;display:flex;flex-direction:column;justify-content:center;gap:28px;">
       <div><div class="big" style="font-size:88px;color:#fff;">30 ч</div><div class="lbl" style="color:#9CA3AF;margin-top:8px;">внутри одного города</div></div>
-      <div><div class="big" style="font-size:56px;color:#FCA5A5;">135,50 ₽</div><div class="lbl" style="color:#9CA3AF;margin-top:8px;">стоимость доставки</div></div>
+      <div><div class="big" style="font-size:56px;color:#FCA5A5;">135,50 ₽</div><div class="lbl" style="color:#9CA3AF;margin-top:8px;">себестоимость логистики</div></div>
     </div>
   </div>
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>02 / 10</span></div>
@@ -112,7 +112,7 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
         </div>
         <div style="flex:1;">
           <svg viewBox="0 0 240 190" width="100%">
-            <g stroke="#059669" stroke-width="1.5"><path d="M120 25L200 60L200 140L120 165L40 140L40 60Z"/><path d="M120 25L120 165M40 60L200 140M200 60L40 140"/></g>
+            <g stroke="#059669" stroke-width="1.5"><path d="M120 25L200 60L200 140L120 165L40 140L40 60Z" fill="rgba(5, 150, 105, 0.06)"/><path d="M120 25L120 165M40 60L200 140M200 60L40 140"/></g>
             <g fill="#fff" stroke="#059669" stroke-width="2"><circle cx="120" cy="25" r="9"/><circle cx="40" cy="60" r="9"/><circle cx="200" cy="60" r="9"/><circle cx="40" cy="140" r="9"/><circle cx="200" cy="140" r="9"/><circle cx="120" cy="165" r="9"/></g>
           </svg>
           <div style="font-weight:700;font-size:16px;" class="green">Mesh-сеть</div>
@@ -164,16 +164,19 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
       <div class="big plum">38 <span style="font-size:24px;">оп/день</span></div>
       <div style="font-weight:600;font-size:18px;">Безубыточность при 30% mesh</div>
       <p class="muted" style="font-size:15px;line-height:1.5;">33 оп/день при 62%; фикс. 1 200 ₽/день, мощность 120.</p>
+      <div style="margin-top:auto;"><div style="height:6px;border-radius:999px;background:#E5E7EB;overflow:hidden;"><div style="width:32%;height:6px;border-radius:999px;background:#7B1E7A;"></div></div><div class="lbl" style="font-size:12px;margin-top:8px;">38 из 120 оп/день · 32%</div></div>
     </div>
     <div class="card" style="flex:1;display:flex;flex-direction:column;gap:16px;">
       <div class="big plum">80–85%</div>
       <div style="font-weight:600;font-size:18px;">Рабочий коридор очереди M/M/1</div>
       <p class="muted" style="font-size:15px;line-height:1.5;">0,80–1,13 ч; выше 85% — авто-перелив в хаб.</p>
+      <div style="margin-top:auto;"><div style="height:6px;border-radius:999px;background:#E5E7EB;overflow:hidden;"><div style="width:85%;height:6px;border-radius:999px;background:#7B1E7A;"></div></div><div class="lbl" style="font-size:12px;margin-top:8px;">порог очереди M/M/1 · 85%</div></div>
     </div>
     <div class="card" style="flex:1;display:flex;flex-direction:column;gap:16px;">
       <div class="big plum">21 → 52 <span style="font-size:24px;">дн</span></div>
       <div style="font-weight:600;font-size:18px;">Срок хранения</div>
       <p class="muted" style="font-size:15px;line-height:1.5;">На 21-й день алерт и перемещение за 60 ₽; на 52-й день хранение обнуляет прибыль продавца.</p>
+      <div style="margin-top:auto;"><div style="height:6px;border-radius:999px;background:#E5E7EB;overflow:hidden;"><div style="width:40%;height:6px;border-radius:999px;background:#7B1E7A;"></div></div><div class="lbl" style="font-size:12px;margin-top:8px;">21 из 52 дней хранения · 40%</div></div>
     </div>
   </div>
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>05 / 10</span></div>
@@ -184,13 +187,13 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
   <div class="kicker">Межгород и масштаб</div>
   <h2>Адаптивный overflow спасает сеть при двойной перегрузке</h2>
   <div class="body row">
-    <div class="card" style="width:430px;display:flex;flex-direction:column;gap:18px;">
+    <div class="card" style="width:430px;display:flex;flex-direction:column;gap:26px;">
       <div style="font-weight:700;font-size:20px;">Межгород</div>
       <p style="font-size:16px;line-height:1.5;color:#6B7280;">Предразмещение остатка в городе получателя: магистраль <b style="color:#111827">10,50 ₽</b>.</p>
-      <div class="row" style="gap:12px;flex-wrap:wrap;">
-        <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">+5,00 ₽</div><div class="lbl">цепочка</div></div>
-        <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">−30 ₽</div><div class="lbl">покупатель</div></div>
-        <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">3 ч</div><div class="lbl">срок</div></div>
+      <div class="row" style="gap:22px;flex-wrap:wrap;">
+        <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">+5,00 ₽</div><div class="lbl" style="margin-top:6px;">цепочка</div></div>
+        <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">−30 ₽</div><div class="lbl" style="margin-top:6px;">покупатель</div></div>
+        <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">3 ч</div><div class="lbl" style="margin-top:6px;">срок</div></div>
       </div>
       <p style="font-size:15px;line-height:1.5;color:#6B7280;border-top:1px solid #E5E7EB;padding-top:16px;">Нет остатка → честный откат на хаб.</p>
     </div>
@@ -199,10 +202,10 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
       <table style="font-size:16px;">
         <thead><tr><th>Метрика</th><th>Наивный mesh</th><th class="d">Overflow 85%</th></tr></thead>
         <tbody>
-          <tr><td>Опоздания</td><td>2 000</td><td class="d">953</td></tr>
-          <tr><td>Макс. загрузка</td><td>226%</td><td class="d">136%</td></tr>
-          <tr><td>Потери отмен</td><td>701,6 тыс. ₽</td><td class="d">351,9 тыс. ₽</td></tr>
-          <tr><td>Маржа МП</td><td>5,75%</td><td class="d">10,00%</td></tr>
+          <tr><td>Опоздания</td><td>2 000</td><td style="color:#059669;font-weight:600;">953</td></tr>
+          <tr><td>Макс. загрузка</td><td>226%</td><td style="color:#059669;font-weight:600;">136%</td></tr>
+          <tr><td>Потери отмен</td><td>701,6 тыс. ₽</td><td style="color:#059669;font-weight:600;">351,9 тыс. ₽</td></tr>
+          <tr><td>Маржа МП</td><td>5,75%</td><td style="color:#059669;font-weight:600;">10,00%</td></tr>
           <tr><td style="border-bottom:0">Доставка</td><td style="border-bottom:0">107,15 ₽</td><td class="d" style="border-bottom:0;color:#111827">124,12 ₽</td></tr>
         </tbody>
       </table>
