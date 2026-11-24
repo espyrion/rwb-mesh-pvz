@@ -47,14 +47,14 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
 
 <!-- 1 -->
 <section class="slide dark" style="justify-content:space-between;">
-  <div class="tag">ХАКАТОН RWB · ТОП ИИ</div>
+  <div class="tag">ХАКАТОН RWB · ТОП ИИ СТАРТ</div>
   <div>
     <h1 style="max-width:900px;">Посылка не должна ехать через Казань</h1>
     <p style="font-size:30px;margin-top:28px;color:#9CA3AF;">Mesh-доставка через ПВЗ: <span style="color:#F9FAFB;font-weight:600;">3 часа вместо 30</span></p>
   </div>
   <div style="border-top:1px solid rgba(255,255,255,.12);padding-top:20px;font-size:16px;line-height:1.7;">
     <div>Меркушев Михаил · Казаков Евгений · Родионова Дарья · Степанова Татьяна</div>
-    <div class="muted">ПГТУ, Йошкар-Ола · Науч. рук. Курасов П. А.</div>
+    <div class="muted">ПГТУ, Йошкар-Ола</div>
   </div>
 </section>
 
@@ -150,7 +150,8 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
         </tbody>
       </table>
     </div>
-    <p class="muted" style="font-size:14px;margin-top:20px;">Параметры модели economics/params.yaml (не прайс RWB): эталон 2 500 ₽, 1,5 яч., 3 дня хранения</p>
+    <div style="margin-top:20px;padding:14px 18px;background:#F5ECF5;border-radius:12px;font-size:16px;font-weight:600;color:#7B1E7A;">45,50 ₽ экономии логистики = 30 ₽ покупателю + 15 ₽ ПВЗ + 0,50 ₽ маркетплейсу</div>
+    <p class="muted" style="font-size:14px;margin-top:16px;">Параметры модели economics/params.yaml (не прайс RWB): эталон 2 500 ₽, 1,5 яч., 3 дня хранения</p>
   </div>
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>04 / 10</span></div>
 </section>
@@ -195,7 +196,7 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
         <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">−30 ₽</div><div class="lbl" style="margin-top:6px;">покупатель</div></div>
         <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">3 ч</div><div class="lbl" style="margin-top:6px;">срок</div></div>
       </div>
-      <p style="font-size:15px;line-height:1.5;color:#6B7280;border-top:1px solid #E5E7EB;padding-top:16px;">Нет остатка → честный откат на хаб.</p>
+      <p style="font-size:15px;line-height:1.5;color:#6B7280;border-top:1px solid #E5E7EB;padding-top:16px;">МП −10,00 ₽ (прибыль 348,50 ₽) · нет остатка — честный откат на хаб.</p>
     </div>
     <div class="card" style="flex:1;padding:24px 24px 8px;">
       <div style="font-weight:700;font-size:20px;margin-bottom:10px;">2 000 заказов/день, seed 42</div>
@@ -238,7 +239,7 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
       <div class="row" style="gap:12px;">
         <div class="card" style="flex:1;padding:16px;"><div style="font-size:24px;font-weight:700;" class="plum">5/5</div><div class="lbl">сценариев ТЗ</div></div>
         <div class="card" style="flex:1;padding:16px;"><div style="font-size:24px;font-weight:700;" class="plum">149</div><div class="lbl">автотестов · CI green</div></div>
-        <div class="card" style="flex:1;padding:16px;"><div style="font-size:24px;font-weight:700;" class="plum">9 · 5 · 270 ₽</div><div class="lbl">точек · заказов · логистика</div></div>
+        <div class="card" style="flex:1;padding:16px;"><div style="font-size:20px;font-weight:700;white-space:nowrap;" class="plum">9 точек · 80% mesh</div><div class="lbl">5 заказов · логистика 270 ₽</div></div>
       </div>
     </div>
     <div class="win" style="flex:1;"><div class="bar"><i></i><i></i><i></i><span>localhost:5173</span></div><img src="../screenshots/01-dashboard.png" alt=""></div>
@@ -277,8 +278,8 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
       <div class="item"><div class="num" style="background:#FEF2F2;color:#DC2626;">!</div><div><b style="font-size:16px;">Демо-ключи и SQLite</b><p>Один писатель, ключи не являются секретами.</p></div></div>
     </div>
     <div class="col" style="flex:1;gap:16px;">
-      <div class="card item" style="align-items:center;"><div class="num">1</div><div><b>Пилот 30 дней</b><p>8 ПВЗ Йошкар-Олы, 288 тыс. ₽, метрики M1–M5 и stop-критерии.</p></div></div>
-      <div class="card item" style="align-items:center;"><div class="num">2</div><div><b>Продакшн-ядро</b><p>PostgreSQL, OIDC, аудит, очереди.</p></div></div>
+      <div class="card item" style="align-items:center;"><div class="num">1</div><div><b>Пилот 30 дней</b><p>8 ПВЗ Йошкар-Олы, 288 тыс. ₽. Цели: ≥40% локальных пар, p95 ≤12 ч; stop — p95 выше 24 ч два дня подряд.</p></div></div>
+      <div class="card item" style="align-items:center;"><div class="num">2</div><div><b>Продакшн-ядро</b><p>PostgreSQL, OIDC, аудит, очереди, бэкапы и SLA.</p></div></div>
       <div class="card item" style="align-items:center;"><div class="num">3</div><div><b>Тиражирование</b><p>Склады, платежи, новые города.</p></div></div>
     </div>
   </div>
@@ -292,7 +293,7 @@ tr.b td { font-weight: 700; background: #FAFAFB; }
   <div class="row" style="gap:14px;margin-top:8px;">
     <span class="badge">−27 ч покупателю</span><span class="badge">+15 ₽ ПВЗ</span><span class="badge">5/5 сценариев и 149 тестов</span>
   </div>
-  <div style="font-size:15px;color:#9CA3AF;margin-top:20px;line-height:1.7;">Меркушев Михаил · Казаков Евгений · Родионова Дарья · Степанова Татьяна<br>ПГТУ, Йошкар-Ола · Науч. рук. Курасов П. А.</div>
+  <div style="font-size:15px;color:#9CA3AF;margin-top:20px;line-height:1.7;">Меркушев Михаил · Казаков Евгений · Родионова Дарья · Степанова Татьяна<br>ПГТУ, Йошкар-Ола</div>
   <div style="font-size:20px;font-weight:600;color:#F9FAFB;">Спасибо. Переходим к живому демо</div>
 </section>
 

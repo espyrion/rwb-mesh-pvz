@@ -13,7 +13,7 @@
 | 5. Автотесты и CI | `api/tests/`, `economics/tests/`, `.github/workflows/ci.yml` |
 | 6. API-контракт | `docs/API.md`, `docs/openapi.json` |
 | 7. Демонстрационные сценарии | `docs/SCENARIOS.md`, `docs/SCENARIOS_REPORT.md`, `scripts/demo.py` (7/7) |
-| 8. Презентация и речь | `docs/pitch/RWB-Mesh-PVZ-pitch.pptx`, `.pdf`, `docs/pitch/SPEECH.md` |
+| 8. Презентация и речь | `docs/pitch/slides.html` (исходник) → `docs/pitch/RWB-Mesh-PVZ-pitch.pdf`, `docs/pitch/SPEECH.md` |
 | 9. Происхождение данных, backup-видео | `docs/PROVENANCE.md`, `docs/demo-backup.mp4` |
 
 ## 1. Репозиторий и структура
@@ -115,7 +115,7 @@ curl http://localhost:8000/api/v1/health/deep
 | `docs/REPLICATION.md` | тиражирование, метрики, риски, техплан |
 | `docs/PROVENANCE.md` | откуда числа, как воспроизвести, состояние веток |
 | `docs/CONTRIBUTORS.md` | вклад и проверяемость |
-| `docs/pitch/` | слайды, речь, PDF (пересобраны под актуальные параметры) |
+| `docs/pitch/` | `slides.html` (исходник), `RWB-Mesh-PVZ-pitch.pdf`, `SPEECH.md` |
 | `docs/demo-backup.mp4` | backup-видео прогона |
 
 ## 6. Что проверяет CI
