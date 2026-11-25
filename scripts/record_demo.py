@@ -176,7 +176,7 @@ def record(work: Path) -> Path:
         page.wait_for_selector("text=зелёная зона", timeout=20_000)
         hold(page, 3.0)
         smooth_scroll(page, "text=Зелёная зона 4 сторон", "start")
-        hold(page, 6.0)  # ДА, 2 629 ₽, 129 ₽, +0,50 ₽
+        hold(page, 6.0)  # ДА, 2 649 ₽, 149 ₽, +23,50 ₽
 
         # ползунок «Бонус ПВЗ за заказ без хаба»: 15 → 5 ₽, пересчёт через API
         caption(page, "Кадр 2 · Бонус ПВЗ за заказ без хаба: 15 → 5 ₽ (пересчёт через API)")

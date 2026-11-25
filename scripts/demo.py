@@ -673,6 +673,14 @@ def main() -> int:
         return 1
     print(f"API: {API} | health: {health}")
 
+    # Сброс виртуальных часов к START перед каждым прогоном —
+    # чтобы период фиксированных затрат не накапливался между запусками.
+    try:
+        reset = call("/clock/reset", "POST")
+        print(f"Часы сброшены: {reset.get('virtual_now')}")
+    except Exception:
+        pass  # эндпоинт может отсутствовать в старых сборках
+
     cleanup_notes = cleanup_demo_stock()
     pair, stand_notes = prepare_pair()
     stand_notes = cleanup_notes + stand_notes

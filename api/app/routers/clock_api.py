@@ -31,3 +31,11 @@ def advance_clock(
     }
     db.commit()
     return summary
+
+
+@router.post("/clock/reset", response_model=ClockOut)
+def reset_clock(db: Session = Depends(get_db)):
+    """Вернуть виртуальные часы на START (день демо) — повторный прогон сценария."""
+    clock.set_now(db, clock.START)
+    db.commit()
+    return {"virtual_now": clock.now(db).isoformat(), "timezone": "Europe/Moscow (virtual)"}

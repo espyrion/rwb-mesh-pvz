@@ -15,3 +15,7 @@ web/build/
 .local/
 .env
 .DS_Store
+team-prep/
+*.tmp
+*.bak
+.~lock.*

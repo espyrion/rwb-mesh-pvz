@@ -193,7 +193,7 @@ def run_audit(session: Session, pvz: Pvz, actual: dict[int, int], note: str = ""
 
     shortage_rate = float(p("pvz", "audit_shortage_penalty_rub", default=30.0))
     surplus_rate = float(p("pvz", "audit_surplus_penalty_rub", default=10.0))
-    cap = float(p("pvz", "audit_penalty_cap_rub", default=500.0))
+    cap = float(p("pvz", "audit_penalty_cap_rub", default=200.0))
     penalty = round(min(cap, shortage_units * shortage_rate + surplus_units * surplus_rate), 2)
 
     if penalty > 0:

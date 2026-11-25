@@ -45,8 +45,9 @@ def seller_pct(session: Session, item: Item) -> float:
 
 
 def delivery_fee(kind: str) -> float:
-    key = "buyer_delivery_fee_local_rub" if kind == "mesh" else "buyer_delivery_fee_hub_rub"
-    return float(p("fees", key, default=119.0))
+    if kind == "mesh":
+        return float(p("fees", "buyer_delivery_fee_local_rub", default=149.0))
+    return float(p("fees", "buyer_delivery_fee_hub_rub", default=159.0))
 
 
 def quote(session: Session, item: Item, qty: int, route_kind: str) -> dict:
@@ -67,7 +68,7 @@ def post_issue(session: Session, order: Order, item: Item, route: Route) -> list
     q = quote(session, item, order.qty, route.kind)
     dst = session.get(Pvz, order.to_pvz)
     reward = float(dst.op_fee)
-    bonus = float(p("pvz", "mesh_bonus_rub", default=15.0)) if route.kind == "mesh" else 0.0
+    bonus = float(p("pvz", "mesh_bonus_rub", default=12.0)) if route.kind == "mesh" else 0.0
     logistics = float(route.total_cost_rub)
     goods = q["goods_rub"]
     commission = q["commission_rub"]

@@ -2,302 +2,835 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>RWB Mesh · ПВЗ как узлы сети — питч</title>
+<title>RWB Mesh · ПВЗ как узлы городской сети — финальный питч</title>
 <style>
 @page { size: 1280px 720px; margin: 0; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: #F8F9FA; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111827; font-variant-numeric: tabular-nums; }
-.slide { position: relative; width: 1280px; height: 720px; overflow: hidden; padding: 56px 56px 72px; background: #F8F9FA; page-break-after: always; break-after: page; display: flex; flex-direction: column; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  color: #0B0D14; font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+}
+.slide {
+  position: relative; width: 1280px; height: 720px; padding: 46px 60px 46px;
+  background: #F8F9FA; overflow: hidden; display: flex; flex-direction: column;
+  page-break-after: always; break-after: page; page-break-inside: avoid;
+}
 .slide:last-child { page-break-after: auto; break-after: auto; }
-.dark { background: #0B0D14; color: #F9FAFB; }
-.dark::before { content: ""; position: absolute; right: -240px; top: -260px; width: 900px; height: 900px; background: radial-gradient(circle, rgba(123,30,122,0.28) 0%, rgba(123,30,122,0) 65%); }
-.dark > * { position: relative; }
+.slide.dark { background: #0B0D14; color: #F3F4F6; }
+
+/* ---------- header ---------- */
+.kicker { display: flex; align-items: center; gap: 10px; font-size: 11px; letter-spacing: .16em;
+  text-transform: uppercase; font-weight: 700; color: #7B1E7A; margin-bottom: 10px; flex: none; }
+.kicker::before { content: ""; width: 20px; height: 2px; background: #7B1E7A; display: block; }
+.dark .kicker { color: #C084FC; } .dark .kicker::before { background: #C084FC; }
+h2 { font-size: 35px; line-height: 1.13; letter-spacing: -.022em; font-weight: 700; max-width: 1120px; flex: none; }
+h2 .n { color: #7B1E7A; } .dark h2 .n { color: #C084FC; }
+.body { flex: 1; min-height: 0; margin-top: 20px; display: flex; flex-direction: column; }
+
+/* ---------- primitives ---------- */
+.card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; }
+.dark .card { background: #12141C; border-color: rgba(255,255,255,.11); }
+.k { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: #6B7280; font-weight: 700; }
+.dark .k { color: #9CA3AF; }
 .muted { color: #6B7280; } .dark .muted { color: #9CA3AF; }
-.foot { position: absolute; left: 56px; right: 56px; bottom: 28px; display: flex; justify-content: space-between; font-size: 12px; color: #6B7280; border-top: 1px solid #E5E7EB; padding-top: 10px; }
-.tag { font-size: 13px; letter-spacing: .14em; font-weight: 600; color: #D8A8D7; }
-.kicker { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #7B1E7A; margin-bottom: 12px; }
-h1 { font-size: 76px; line-height: 1.04; font-weight: 700; letter-spacing: -.03em; }
-h2 { font-size: 36px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; max-width: 1050px; }
-.card { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; padding: 24px; }
-.row { display: flex; gap: 24px; } .col { display: flex; flex-direction: column; gap: 24px; }
-.body { flex: 1; margin-top: 24px; min-height: 0; }
-.big { font-size: 64px; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
-.lbl { font-size: 14px; color: #6B7280; }
 .green { color: #059669; } .red { color: #DC2626; } .plum { color: #7B1E7A; }
-.pill { display: inline-block; background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; border-radius: 999px; padding: 10px 18px; font-weight: 600; font-size: 16px; }
-table { width: 100%; border-collapse: collapse; font-size: 18px; }
-th { background: #F3F4F6; text-align: left; font-size: 13px; font-weight: 600; color: #6B7280; padding: 12px 16px; text-transform: uppercase; letter-spacing: .06em; }
-td { padding: 14px 16px; border-bottom: 1px solid #E5E7EB; }
-th:not(:first-child), td:not(:first-child) { text-align: right; }
-td.d { color: #059669; font-weight: 600; } th.d { color: #059669; }
-tr.b td { font-weight: 700; background: #FAFAFB; }
-.win { background: #0B0D14; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(17,24,39,.18); display: flex; flex-direction: column; }
-.win .bar { height: 28px; flex: none; background: #1B1E2B; display: flex; align-items: center; gap: 6px; padding: 0 12px; }
-.win .bar i { width: 9px; height: 9px; border-radius: 50%; background: #4B5563; display: block; }
-.win .bar span { margin-left: 12px; font-size: 11px; color: #9CA3AF; background: #0B0D14; border-radius: 6px; padding: 2px 40px; }
-.win img { display: block; width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: center; background: #0d1220; }
-.num { flex: none; width: 32px; height: 32px; border-radius: 50%; background: #F5ECF5; color: #7B1E7A; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 15px; }
-.item { display: flex; gap: 16px; align-items: flex-start; }
-.item b { display: block; font-size: 18px; margin-bottom: 4px; } .item p { font-size: 15px; color: #6B7280; line-height: 1.4; }
-.badge { border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 12px 22px; font-size: 18px; font-weight: 600; color: #F9FAFB; }
+.dark .green { color: #34D399; } .dark .red { color: #F87171; }
+.num { font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+.foot { position: absolute; left: 60px; right: 60px; bottom: 18px; display: flex; justify-content: space-between;
+  font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #9CA3AF;
+  border-top: 1px solid #E5E7EB; padding-top: 7px; }
+.dark .foot { border-top-color: rgba(255,255,255,.12); color: #6B7280; }
+
+/* ---------- 01 cover ---------- */
+.cover-top { display: flex; justify-content: space-between; align-items: center; flex: none; }
+.badge { display: inline-block; border: 1px solid rgba(255,255,255,.22); border-radius: 999px;
+  padding: 7px 16px; font-size: 10.5px; letter-spacing: .16em; font-weight: 700; color: #E9D5FF; }
+.cover-top .yr { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #8A8F9A; }
+.cover-main { flex: 1; display: grid; grid-template-columns: 1fr 372px; gap: 54px; align-items: center; min-height: 0; }
+h1 { font-size: 82px; line-height: .98; letter-spacing: -.04em; font-weight: 700; }
+.cover-sub { font-size: 34px; line-height: 1.16; letter-spacing: -.02em; font-weight: 600; color: #D1D5DB; margin-top: 12px; }
+.cover-lead { font-size: 16px; line-height: 1.55; color: #9CA3AF; margin-top: 26px; max-width: 560px; }
+.cover-lead b { color: #F3F4F6; font-weight: 600; }
+.rule { width: 64px; height: 2px; background: #A855F7; margin: 26px 0 0; }
+.kpis { border-left: 1px solid rgba(255,255,255,.12); }
+.kpi { padding: 20px 0 20px 26px; border-bottom: 1px solid rgba(255,255,255,.09); }
+.kpi:first-child { padding-top: 0; } .kpi:last-child { border-bottom: 0; padding-bottom: 0; }
+.kpi .v { font-size: 50px; font-weight: 700; letter-spacing: -.04em; line-height: 1; color: #FFFFFF; }
+.kpi .v em { font-style: normal; font-size: .46em; letter-spacing: -.01em; color: #C084FC; margin-left: 4px; }
+.kpi .d { font-size: 12.5px; line-height: 1.45; color: #9CA3AF; margin-top: 8px; }
+.cover-foot { flex: none; border-top: 1px solid rgba(255,255,255,.12); padding-top: 16px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.person b { display: block; font-size: 13.5px; font-weight: 600; color: #F3F4F6; }
+.person span { display: block; font-size: 11px; color: #6B7280; margin-top: 3px; line-height: 1.35; }
+
+/* ---------- 02 problem ---------- */
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.cmp { padding: 20px 22px 18px; display: flex; flex-direction: column; }
+.cmp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.cmp-val { font-size: 26px; font-weight: 700; letter-spacing: -.025em; }
+.cmp-val small { font-size: 12px; font-weight: 600; color: #6B7280; letter-spacing: 0; }
+.cmp svg { display: block; width: 100%; height: auto; margin: 10px 0 4px; }
+.brk { font-size: 11.5px; line-height: 1.5; color: #6B7280; margin-top: auto; }
+.brk b { color: #0B0D14; font-weight: 600; }
+.delta-pill { display: inline-flex; align-items: center; gap: 8px; background: #ECFDF5; border: 1px solid #A7F3D0;
+  color: #047857; border-radius: 8px; padding: 7px 11px; font-size: 12px; font-weight: 700; align-self: flex-start; margin-top: 8px; }
+.thesis { margin-top: 18px; border-left: 3px solid #7B1E7A; padding: 4px 0 4px 16px;
+  font-size: 14.5px; line-height: 1.5; color: #374151; }
+.thesis b { color: #0B0D14; }
+
+/* ---------- 03 steps ---------- */
+.flow { display: grid; grid-template-columns: 1fr 18px 1fr 18px 1fr 18px 1fr; align-items: stretch; gap: 0; }
+.step { border-top: 2px solid #E5E7EB; padding: 14px 14px 14px 0; }
+.step:last-of-type { padding-right: 0; }
+.step .sn { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; color: #A855F7; }
+.step h3 { font-size: 16.5px; line-height: 1.22; font-weight: 700; margin: 7px 0 8px; letter-spacing: -.01em; }
+.step p { font-size: 12.5px; line-height: 1.45; color: #6B7280; }
+.step p b { color: #0B0D14; font-weight: 600; }
+.arw { display: flex; align-items: center; justify-content: center; color: #C4C8D0; font-size: 15px; padding-top: 8px; }
+.side { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-top: 22px; }
+.side .card { padding: 16px 18px; }
+.side .big { font-size: 34px; }
+.side .lbl { font-size: 11.5px; color: #6B7280; margin-top: 5px; line-height: 1.4; }
+
+/* ---------- 04 economics ---------- */
+.bar-wrap { flex: none; }
+.pl-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.pl-table th { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: #6B7280;
+  font-weight: 700; text-align: right; padding: 0 0 7px; border-bottom: 1px solid #E5E7EB; }
+.pl-table th:first-child { text-align: left; }
+.pl-table td { padding: 7px 0; border-bottom: 1px solid #F1F2F4; text-align: right; }
+.pl-table td:first-child { text-align: left; font-weight: 500; }
+.pl-table td:not(:first-child) { width: 104px; }
+.pl-table tr:last-child td { border-bottom: 0; }
+.pl-table tr.tot td { font-weight: 700; border-top: 1px solid #0B0D14; border-bottom: 0; padding-top: 9px; }
+.pl-table td.up { color: #059669; } .pl-table td.dn { color: #DC2626; } .pl-table td.z { color: #9CA3AF; }
+.be .v { font-size: 40px; font-weight: 700; letter-spacing: -.035em; line-height: 1; }
+.be-row { display: flex; justify-content: space-between; font-size: 12px; padding: 7px 0; border-bottom: 1px solid #F1F2F4; }
+.be-row:last-of-type { border-bottom: 0; }
+.be-row b { font-weight: 700; }
+
+/* ---------- 05 table ---------- */
+.bott { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.bott th { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: #6B7280;
+  font-weight: 700; text-align: left; padding: 0 12px 8px 0; border-bottom: 1px solid #D1D5DB; }
+.bott td { padding: 10px 12px 10px 0; border-bottom: 1px solid #EDEEF1; vertical-align: top; line-height: 1.4; }
+.bott tr:last-child td { border-bottom: 0; }
+.bott .idx { width: 34px; color: #A855F7; font-weight: 700; font-size: 11px; padding-top: 12px; }
+.bott .pain { width: 210px; font-weight: 600; }
+.bott .fix { width: 300px; }
+.bott .fix b { color: #7B1E7A; }
+.bott .mech { color: #6B7280; font-size: 12px; }
+.bott .mech b { color: #0B0D14; font-weight: 600; }
+.bound { margin-top: 14px; display: flex; gap: 14px; align-items: flex-start;
+  background: #FFFFFF; border: 1px solid #E5E7EB; border-left: 3px solid #7B1E7A; border-radius: 8px; padding: 12px 16px; }
+.bound .k { flex: none; padding-top: 2px; }
+.bound p { font-size: 12.5px; line-height: 1.45; color: #374151; }
+.bound p b { color: #0B0D14; }
+
+/* ---------- 06 stress ---------- */
+.sgrid { display: grid; grid-template-columns: 1fr 358px; gap: 22px; flex: 1; min-height: 0; }
+.panels { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 14px; }
+.panel { background: #12141C; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 15px 17px 14px;
+  display: flex; flex-direction: column; gap: 10px; }
+.panel svg { display: block; width: 100%; height: auto; margin: auto 0; }
+.panel .pnote { font-size: 11px; line-height: 1.4; color: #9CA3AF; }
+.panel .pnote b { font-weight: 700; }
+.ctx { padding: 18px 20px; display: flex; flex-direction: column; }
+.ctx .row { display: flex; justify-content: space-between; font-size: 12px; padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,.08); }
+.ctx .row span { color: #9CA3AF; } .ctx .row b { font-weight: 600; color: #F3F4F6; }
+.ctx .note { font-size: 12px; line-height: 1.5; color: #9CA3AF; margin-top: 12px; }
+.ctx .note b { color: #E9D5FF; }
+
+/* ---------- 07 architecture ---------- */
+.stack { display: grid; grid-template-rows: repeat(4, 1fr); gap: 9px; height: 100%; }
+.layer { display: flex; align-items: center; gap: 14px; background: #FFFFFF; border: 1px solid #E5E7EB;
+  border-radius: 10px; padding: 11px 16px; min-height: 0; }
+.layer .ln { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; color: #A855F7; width: 32px; flex: none; }
+.layer .tt { width: 150px; flex: none; }
+.layer .tt b { display: block; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; }
+.layer .tt span { display: block; font-size: 10.5px; color: #6B7280; margin-top: 2px; }
+.layer .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.layer .tags i { font-style: normal; font-size: 10.5px; color: #374151; background: #F5F6F8;
+  border: 1px solid #EBECEF; border-radius: 5px; padding: 3px 7px; white-space: nowrap; }
+.layer.core { border-color: #D8B4D8; background: #FDF7FD; }
+.layer.core .tags i { background: #F7EAF7; border-color: #EBD3EB; }
+.ws { padding: 14px 16px; }
+.ws h3 { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; }
+.ws ul { list-style: none; }
+.ws li { font-size: 12px; line-height: 1.35; padding: 5px 0 5px 18px; position: relative; color: #374151; }
+.ws li::before { position: absolute; left: 0; top: 5px; font-size: 11px; font-weight: 700; }
+.ws.real li::before { content: "✓"; color: #059669; }
+.ws.stub li::before { content: "○"; color: #9CA3AF; }
+.ws.stub li { color: #6B7280; }
+
+/* ---------- 08 demo ---------- */
+.demo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.dcard { padding: 16px 14px 14px; display: flex; flex-direction: column; }
+.dcard svg { display: block; width: 40px; height: 40px; margin-bottom: 10px; }
+.dcard .dn { font-size: 10px; font-weight: 700; letter-spacing: .12em; color: #A855F7; }
+.dcard h3 { font-size: 14.5px; font-weight: 700; line-height: 1.2; margin: 6px 0 8px; letter-spacing: -.01em; }
+.dcard p { font-size: 11.5px; line-height: 1.45; color: #6B7280; flex: 1; }
+.dcard .metric { margin-top: 10px; padding-top: 9px; border-top: 1px solid #F1F2F4; font-size: 11px;
+  font-weight: 700; color: #7B1E7A; }
+.demo-badge { margin-top: 16px; display: flex; align-items: center; justify-content: space-between;
+  background: #0B0D14; color: #F3F4F6; border-radius: 10px; padding: 14px 20px; }
+.demo-badge b { font-size: 13.5px; font-weight: 600; }
+.demo-badge span { font-size: 11.5px; color: #9CA3AF; }
+
+/* ---------- 09 pilot ---------- */
+.pilot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; flex: 1; min-height: 0; }
+.pcol { padding: 18px 20px; display: flex; flex-direction: column; }
+.pcol h3 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 12px; }
+.fact b { display: block; font-size: 21px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.fact span { display: block; font-size: 10.5px; color: #6B7280; margin-top: 3px; line-height: 1.3; }
+.stop { margin-top: auto; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 12px; }
+.stop b { color: #B91C1C; font-size: 12.5px; }
+.stop p { font-size: 11.5px; color: #7F1D1D; line-height: 1.4; margin-top: 2px; }
+.slist { list-style: none; margin-top: 10px; }
+.slist li { font-size: 12px; line-height: 1.4; padding: 4.5px 0 4.5px 16px; position: relative; color: #374151; }
+.slist li::before { content: ""; position: absolute; left: 0; top: 11px; width: 6px; height: 6px; background: #7B1E7A; border-radius: 2px; }
+.slist li b { font-weight: 600; }
+
+/* ---------- 10 final ---------- */
+.anchors { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid rgba(255,255,255,.14); }
+.anchor { padding: 20px 22px 0 0; border-right: 1px solid rgba(255,255,255,.09); }
+.anchor:last-child { border-right: 0; }
+.anchor .ak { font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; margin-bottom: 12px; }
+.anchor .v { font-size: 56px; font-weight: 700; letter-spacing: -.045em; line-height: 1; color: #FFFFFF; }
+.anchor .d { font-size: 12px; line-height: 1.4; color: #9CA3AF; margin-top: 10px; max-width: 205px; }
+.crew { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.member { border-top: 1px solid rgba(255,255,255,.16); padding-top: 10px; }
+.member b { display: block; font-size: 13.5px; font-weight: 600; }
+.member span { display: block; font-size: 10.5px; line-height: 1.4; color: #6B7280; margin-top: 4px; }
+.cta { display: flex; align-items: baseline; gap: 14px; }
+.cta .dot { width: 8px; height: 8px; border-radius: 50%; background: #34D399; flex: none; align-self: center; }
+.cta b { font-size: 17px; font-weight: 600; }
+.cta span { font-size: 11.5px; color: #6B7280; margin-left: auto; }
+.pull { font-size: 20px; line-height: 1.45; letter-spacing: -.012em; color: #D1D5DB; max-width: 840px; border-left: 2px solid #A855F7; padding-left: 20px; }
+.pull b { color: #FFFFFF; font-weight: 600; }
 </style>
 </head>
 <body>
 
-<!-- 1 -->
-<section class="slide dark" style="justify-content:space-between;">
-  <div class="tag">ХАКАТОН RWB · ТОП ИИ СТАРТ</div>
-  <div>
-    <h1 style="max-width:900px;">Посылка не должна ехать через Казань</h1>
-    <p style="font-size:30px;margin-top:28px;color:#9CA3AF;">Mesh-доставка через ПВЗ: <span style="color:#F9FAFB;font-weight:600;">3 часа вместо 30</span></p>
+<!-- ============ 01 COVER ============ -->
+<section class="slide dark">
+  <div class="cover-top">
+    <span class="badge">ФИНАЛ · ТОП ИИ СТАРТ · ПГТУ</span>
+    <span class="yr">Хакатон RWB · ноябрь 2026</span>
   </div>
-  <div style="border-top:1px solid rgba(255,255,255,.12);padding-top:20px;font-size:16px;line-height:1.7;">
-    <div>Меркушев Михаил · Казаков Евгений · Родионова Дарья · Степанова Татьяна</div>
-    <div class="muted">ПГТУ, Йошкар-Ола</div>
+
+  <div class="cover-main">
+    <div>
+      <h1>RWB Mesh</h1>
+      <div class="cover-sub">ПВЗ как узлы<br>городской сети</div>
+      <div class="rule"></div>
+      <p class="cover-lead">Ходовой товар едет не через Казань, а в соседний ПВЗ:
+        <b>3 часа вместо 30</b> и <b>на 33,6% дешевле</b>. Хаб остаётся для межгорода.</p>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="v">−33,6<em>%</em></div>
+        <div class="d">логистика 90,00 ₽ вместо 135,50 ₽<br>на заказ</div>
+      </div>
+      <div class="kpi">
+        <div class="v">3<em>ч</em></div>
+        <div class="d">вместо 30 ч — от приёмки<br>до выдачи в ПВЗ</div>
+      </div>
+      <div class="kpi">
+        <div class="v">51,6<em>%</em></div>
+        <div class="d">экономии 45,50 ₽ остаётся<br>маркетплейсу — чистыми</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cover-foot">
+    <div class="person"><b>Меркушев Михаил</b><span>капитан · архитектура, бэкенд-ядро, Docker/CI</span></div>
+    <div class="person"><b>Казаков Евгений</b><span>бэкенд · маршрутизация, отказ узлов, OpenAPI</span></div>
+    <div class="person"><b>Родионова Дарья</b><span>экономика · модель P&amp;L, симуляция</span></div>
+    <div class="person"><b>Степанова Татьяна</b><span>фронтенд · карта сети, демо-кокпит</span></div>
   </div>
 </section>
 
-<!-- 2 -->
+<!-- ============ 02 PROBLEM ============ -->
 <section class="slide">
-  <div class="kicker">Проблема</div>
-  <h2>Чтобы доехать на соседнюю улицу, посылка едет в другой город</h2>
-  <div class="body row">
-    <div class="card" style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:32px;">
-      <div class="lbl">Маршрут внутри одного города (старая схема через хаб)</div>
-      <svg viewBox="0 0 700 150" width="100%" style="display:block;">
-        <g font-family="Inter, sans-serif" text-anchor="middle">
-          <rect x="1" y="45" width="110" height="60" rx="12" fill="#fff" stroke="#E5E7EB" stroke-width="2"/>
-          <text x="56" y="82" font-size="18" font-weight="700" fill="#111827">ПВЗ</text>
-          <rect x="199" y="45" width="130" height="60" rx="12" fill="#fff" stroke="#DC2626" stroke-width="2"/>
-          <text x="264" y="72" font-size="18" font-weight="700" fill="#111827">Хаб</text>
-          <text x="264" y="94" font-size="14" fill="#DC2626">4 ч</text>
-          <rect x="417" y="45" width="130" height="60" rx="12" fill="#fff" stroke="#DC2626" stroke-width="2"/>
-          <text x="482" y="72" font-size="16" font-weight="700" fill="#111827">Магистраль</text>
-          <text x="482" y="94" font-size="14" fill="#DC2626">22 ч</text>
-          <rect x="590" y="45" width="108" height="60" rx="12" fill="#fff" stroke="#E5E7EB" stroke-width="2"/>
-          <text x="644" y="68" font-size="14" font-weight="700" fill="#111827">Последняя</text>
-          <text x="644" y="85" font-size="14" font-weight="700" fill="#111827">миля</text>
-          <text x="644" y="101" font-size="13" fill="#DC2626">4 ч</text>
-          <g stroke="#9CA3AF" stroke-width="2" fill="none"><path d="M113 75H197"/><path d="M331 75H415"/><path d="M549 75H588"/></g>
-          <g fill="#9CA3AF"><path d="M197 75l-8-5v10z"/><path d="M415 75l-8-5v10z"/><path d="M588 75l-8-5v10z"/></g>
-        </g>
-      </svg>
-      <p style="font-size:18px;line-height:1.5;color:#6B7280;">22 часа из 30 посылка проводит на магистрали между городами, хотя адресат всё это время находится в том же городе.</p>
+  <div class="kicker">Проблема и идея</div>
+  <h2>Внутри города посылка едет <span class="n">30 часов</span> и стоит <span class="n">135,50 ₽</span></h2>
+
+  <div class="body">
+    <div class="duo">
+      <!-- hub -->
+      <div class="card cmp">
+        <div class="cmp-head">
+          <span class="k">Сегодня · через хаб</span>
+          <span class="cmp-val red">30 ч <small>· 135,50 ₽</small></span>
+        </div>
+        <svg viewBox="0 0 520 104" aria-label="Маршрут через хаб">
+          <g font-family="system-ui, sans-serif">
+            <rect x="0" y="16" width="94" height="42" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+            <text x="47" y="42" font-size="12.5" font-weight="600" text-anchor="middle" fill="#0B0D14">ПВЗ</text>
+            <rect x="142" y="16" width="94" height="42" rx="8" fill="#FFFFFF" stroke="#DC2626" stroke-width="1.5"/>
+            <text x="189" y="42" font-size="12.5" font-weight="600" text-anchor="middle" fill="#0B0D14">Хаб</text>
+            <rect x="284" y="16" width="94" height="42" rx="8" fill="#FFFFFF" stroke="#DC2626" stroke-width="1.5"/>
+            <text x="331" y="42" font-size="11" font-weight="600" text-anchor="middle" fill="#0B0D14">Магистраль</text>
+            <rect x="426" y="16" width="94" height="42" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+            <text x="473" y="42" font-size="12.5" font-weight="600" text-anchor="middle" fill="#0B0D14">ПВЗ</text>
+            <g stroke="#DC2626" stroke-width="1.5" fill="none">
+              <path d="M96 37H140"/><path d="M238 37H282"/><path d="M380 37H424"/>
+            </g>
+            <g fill="#DC2626">
+              <path d="M140 37l-6-3.5v7z"/><path d="M282 37l-6-3.5v7z"/><path d="M424 37l-6-3.5v7z"/>
+            </g>
+            <text x="118" y="76" font-size="11" text-anchor="middle" fill="#DC2626" font-weight="600">4 ч</text>
+            <text x="260" y="76" font-size="11" text-anchor="middle" fill="#DC2626" font-weight="600">22 ч</text>
+            <text x="402" y="76" font-size="11" text-anchor="middle" fill="#DC2626" font-weight="600">4 ч</text>
+            <text x="0" y="98" font-size="10" fill="#9CA3AF">межгород: сортировка, магистраль, обратная сортировка</text>
+          </g>
+        </svg>
+        <div class="brk"><b>70 ₽</b> обработка + <b>10,50 ₽</b> магистраль + <b>55 ₽</b> последняя миля.
+          Адресат всё это время — в том же городе.</div>
+      </div>
+
+      <!-- mesh -->
+      <div class="card cmp" style="border-color:#A7F3D0;">
+        <div class="cmp-head">
+          <span class="k">RWB Mesh · ПВЗ → ПВЗ</span>
+          <span class="cmp-val green">3 ч <small>· 90,00 ₽</small></span>
+        </div>
+        <svg viewBox="0 0 520 104" aria-label="Прямой маршрут между ПВЗ">
+          <g font-family="system-ui, sans-serif">
+            <rect x="0" y="16" width="94" height="42" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+            <text x="47" y="42" font-size="12.5" font-weight="600" text-anchor="middle" fill="#0B0D14">ПВЗ</text>
+            <rect x="426" y="16" width="94" height="42" rx="8" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
+            <text x="473" y="42" font-size="12.5" font-weight="600" text-anchor="middle" fill="#0B0D14">ПВЗ</text>
+            <path d="M96 37H424" stroke="#059669" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+            <path d="M424 37l-7-4v8z" fill="#059669"/>
+            <text x="260" y="30" font-size="11" font-weight="600" text-anchor="middle" fill="#059669">3 ч · 90,00 ₽</text>
+            <text x="260" y="76" font-size="10" text-anchor="middle" fill="#6B7280">без хаба и магистрали</text>
+            <text x="0" y="98" font-size="10" fill="#9CA3AF">локальный рейс курьера по городу, слот выдачи в том же ПВЗ</text>
+          </g>
+        </svg>
+        <div class="brk">Только <b>локальный сегмент</b>: приёмка, сортировка по ячейкам, рейс 3 ч.
+          Обработки на хабе нет — её и не оплачиваем.</div>
+        <div class="delta-pill">−45,50 ₽ на заказ · −33,6%</div>
+      </div>
     </div>
-    <div class="card" style="width:340px;background:#111827;border-color:#111827;color:#fff;display:flex;flex-direction:column;justify-content:center;gap:28px;">
-      <div><div class="big" style="font-size:88px;color:#fff;">30 ч</div><div class="lbl" style="color:#9CA3AF;margin-top:8px;">внутри одного города</div></div>
-      <div><div class="big" style="font-size:56px;color:#FCA5A5;">135,50 ₽</div><div class="lbl" style="color:#9CA3AF;margin-top:8px;">себестоимость логистики</div></div>
-    </div>
+
+    <div class="thesis"><b>Mesh не заменяет хаб, а разгружает его.</b> Через сеть ПВЗ едут только ходовые городские SKU.
+      Межгород, крупный габарит и неликвид остаются на хабе — там, где консолидация действительно экономит.</div>
   </div>
+
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>02 / 10</span></div>
 </section>
 
-<!-- 3 -->
+<!-- ============ 03 HOW ============ -->
 <section class="slide">
-  <div class="kicker">Решение и эффект</div>
-  <h2>Убрали хаб из города — оставили его для межгорода</h2>
-  <div class="body row">
-    <div class="card col" style="flex:1;gap:16px;justify-content:center;">
-      <div class="row" style="gap:24px;">
-        <div style="flex:1;">
-          <svg viewBox="0 0 240 190" width="100%">
-            <g stroke="#DC2626" stroke-width="1.5"><path d="M120 95L120 25M120 95L40 60M120 95L200 60M120 95L40 140M120 95L200 140M120 95L120 165"/></g>
-            <circle cx="120" cy="95" r="16" fill="#fff" stroke="#DC2626" stroke-width="2"/>
-            <g fill="#fff" stroke="#9CA3AF" stroke-width="2"><circle cx="120" cy="25" r="9"/><circle cx="40" cy="60" r="9"/><circle cx="200" cy="60" r="9"/><circle cx="40" cy="140" r="9"/><circle cx="200" cy="140" r="9"/><circle cx="120" cy="165" r="9"/></g>
-            <text x="120" y="99" font-size="10" font-weight="700" text-anchor="middle" fill="#DC2626" font-family="Inter,sans-serif">ХАБ</text>
-          </svg>
-          <div style="font-weight:700;font-size:16px;" class="red">Звезда</div>
-          <div class="lbl">135,50 ₽ · 30 ч</div>
-        </div>
-        <div style="flex:1;">
-          <svg viewBox="0 0 240 190" width="100%">
-            <g stroke="#059669" stroke-width="1.5"><path d="M120 25L200 60L200 140L120 165L40 140L40 60Z" fill="rgba(5, 150, 105, 0.06)"/><path d="M120 25L120 165M40 60L200 140M200 60L40 140"/></g>
-            <g fill="#fff" stroke="#059669" stroke-width="2"><circle cx="120" cy="25" r="9"/><circle cx="40" cy="60" r="9"/><circle cx="200" cy="60" r="9"/><circle cx="40" cy="140" r="9"/><circle cx="200" cy="140" r="9"/><circle cx="120" cy="165" r="9"/></g>
-          </svg>
-          <div style="font-weight:700;font-size:16px;" class="green">Mesh-сеть</div>
-          <div class="lbl">90 ₽ · 3 ч</div>
-        </div>
+  <div class="kicker">Как это работает</div>
+  <h2>Продавец отгружает <span class="n">20 единиц</span> в ПВЗ у дома — и не платит за магистраль</h2>
+
+  <div class="body">
+    <div class="flow">
+      <div class="step">
+        <div class="sn">ШАГ 01 · СКОРИНГ</div>
+        <h3>Кабинет предлагает ходовые SKU</h3>
+        <p>Score ≥ 60: оборачиваемость 0,45 · спрос 0,35 · габарит 0,20. Продавец видит, что поедет через mesh, а что останется на хабе.</p>
+      </div>
+      <div class="arw">→</div>
+      <div class="step">
+        <div class="sn">ШАГ 02 · ОТГРУЗКА</div>
+        <h3>Малая партия в ближайший ПВЗ</h3>
+        <p>Как FBS: 20 единиц, а не фура. Приёмка 8 ₽/шт, раскладка по ячейкам, остаток сразу виден в системе.</p>
+      </div>
+      <div class="arw">→</div>
+      <div class="step">
+        <div class="sn">ШАГ 03 · ДОСТАВКА</div>
+        <h3>3 часа до соседнего ПВЗ</h3>
+        <p>Курьер везёт по слотам и матрице расстояний. <b>Маржа 367,50 ₽ не режется</b>: логистику платит маркетплейс, не продавец.</p>
+      </div>
+      <div class="arw">→</div>
+      <div class="step">
+        <div class="sn">ШАГ 04 · ОБОРОТ</div>
+        <h3>Алерт на 21-й день</h3>
+        <p>Не продалось — сигнал. Вывоз в другой ПВЗ за 60 ₽ до 52-го дня, пока прибыль продавца не стала нулевой.</p>
       </div>
     </div>
-    <div class="col" style="width:440px;">
-      <div class="row">
-        <div class="card" style="flex:1;"><div class="big green">90 ₽</div><div class="lbl" style="margin-top:10px;">вместо <s>135,50 ₽</s></div></div>
-        <div class="card" style="flex:1;"><div class="big green">3 ч</div><div class="lbl" style="margin-top:10px;">вместо <s>30 ч</s></div></div>
+
+    <div class="side">
+      <div class="card">
+        <div class="k">ПВЗ</div>
+        <div class="big green" style="margin-top:8px;">+12,00 ₽</div>
+        <div class="lbl">бонус за каждый mesh-заказ сверх обычного вознаграждения 27,50 ₽</div>
       </div>
-      <div><span class="pill">Экономия 45,50 ₽ и 27 ч на каждом городском заказе</span></div>
-      <p class="muted" style="font-size:16px;line-height:1.5;">Новые склады не нужны: точки уже стоят, меняется только маршрут.</p>
+      <div class="card">
+        <div class="k">Покупатель</div>
+        <div class="big green" style="margin-top:8px;">149 ₽ <span style="font-size:14px;color:#6B7280;font-weight:600;">вместо 159</span></div>
+        <div class="lbl">доставка дешевле на 10 ₽ и приходит за 3 часа, а не за 30</div>
+      </div>
+      <div class="card" style="background:#0B0D14;border-color:#0B0D14;color:#F3F4F6;">
+        <div class="k" style="color:#9CA3AF;">Продавец</div>
+        <div class="big" style="margin-top:8px;font-size:30px;">367,50 ₽</div>
+        <div class="lbl" style="color:#9CA3AF;">маржа на товаре 2 500 ₽ — одинаковая с хабом, но оборот быстрее</div>
+      </div>
     </div>
   </div>
+
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>03 / 10</span></div>
 </section>
 
-<!-- 4 -->
+<!-- ============ 04 ECONOMICS ============ -->
 <section class="slide">
-  <div class="kicker">Экономика</div>
-  <h2>Выигрывают все четыре стороны</h2>
+  <div class="kicker">Экономика четырёх сторон</div>
+  <h2><span class="n">45,50 ₽</span> экономии делим так, чтобы выиграли все четыре стороны</h2>
+
   <div class="body">
-    <div class="card" style="padding:8px 8px 0;">
-      <table>
-        <thead><tr><th>Сторона</th><th>Хаб</th><th>Mesh</th><th class="d">Δ</th></tr></thead>
-        <tbody>
-          <tr><td>ПВЗ</td><td>27,50 ₽</td><td>39,50 ₽</td><td class="d">+12,00 ₽ / +43,64%</td></tr>
-          <tr><td>Маркетплейс</td><td>358,50 ₽</td><td>382,00 ₽</td><td class="d">+23,50 ₽ / +6,56%</td></tr>
-          <tr><td>Продавец</td><td>367,50 ₽</td><td>367,50 ₽</td><td class="d">0,00 ₽</td></tr>
-          <tr><td>Покупатель (с доставкой)</td><td>2 659,00 ₽</td><td>2 649,00 ₽</td><td class="d">−10,00 ₽ / −0,38%</td></tr>
-          <tr class="b"><td>Цепочка (прибыль)</td><td>753,50 ₽</td><td>789,00 ₽</td><td class="d">+35,50 ₽ / +4,71%</td></tr>
-          <tr><td style="border-bottom:0">Срок доставки</td><td style="border-bottom:0">30 ч</td><td style="border-bottom:0">3 ч</td><td class="d" style="border-bottom:0">−27 ч / −90%</td></tr>
-        </tbody>
-      </table>
+    <div class="bar-wrap">
+      <svg viewBox="0 0 1160 92" style="display:block;width:100%;height:auto;" aria-label="Раскладка экономии 45,50 ₽">
+        <g font-family="system-ui, sans-serif">
+          <rect x="0" y="0" width="598" height="52" fill="#7B1E7A"/>
+          <rect x="598" y="0" width="306" height="52" fill="#A855F7"/>
+          <rect x="904" y="0" width="256" height="52" fill="#059669"/>
+          <text x="20" y="22" font-size="13.5" font-weight="700" fill="#FFFFFF">WB · 23,50 ₽</text>
+          <text x="20" y="38" font-size="11" fill="#E9D5FF">51,6% экономии — чистыми, после выплат ПВЗ</text>
+          <text x="618" y="22" font-size="13.5" font-weight="700" fill="#FFFFFF">ПВЗ · 12,00 ₽</text>
+          <text x="618" y="38" font-size="11" fill="#F3E8FF">26,4% — бонус за заказ</text>
+          <text x="924" y="22" font-size="13.5" font-weight="700" fill="#FFFFFF">Покупателю · 10,00 ₽</text>
+          <text x="924" y="38" font-size="11" fill="#D1FAE5">22,0% — доставка 149 ₽</text>
+          <text x="0" y="78" font-size="11" font-weight="600" fill="#0B0D14">Итого 45,50 ₽ с заказа</text>
+          <text x="1160" y="78" font-size="11" fill="#6B7280" text-anchor="end">Выплаты ПВЗ уже вычтены из доли WB</text>
+        </g>
+      </svg>
     </div>
-    <div style="margin-top:18px;padding:14px 18px;background:#F5ECF5;border-radius:12px;font-size:16px;font-weight:600;color:#7B1E7A;">45,50 ₽ экономии логистики: 23,50 ₽ маркетплейсу (52%) + 12 ₽ ПВЗ (26%) + 10 ₽ покупателю (22%)</div>
-    <p style="font-size:15px;margin-top:12px;color:#111827;font-weight:600;">Больше половины экономии остаётся у маркетплейса. Продавец сохраняет маржу 367,50 ₽ и выигрывает на обороте: 30 → 3 ч.</p>
-    <p class="muted" style="font-size:13px;margin-top:10px;">Параметры модели economics/params.yaml (не прайс RWB): эталон 2 500 ₽, 1,5 яч., 3 дня хранения</p>
+
+    <div style="display:grid;grid-template-columns:1fr 366px;gap:22px;margin-top:14px;flex:1;min-height:0;">
+      <div class="card" style="padding:14px 18px 10px;">
+        <div class="k" style="margin-bottom:8px;">P&amp;L на заказ · товар 2 500 ₽ · 1,5 ячейки · 3 дня хранения</div>
+        <table class="pl-table">
+          <thead>
+            <tr><th>Сторона</th><th>Хаб</th><th>Mesh</th><th>Δ</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>ПВЗ</td><td>27,50 ₽</td><td>39,50 ₽</td><td class="up">+12,00</td></tr>
+            <tr><td>Маркетплейс</td><td>358,50 ₽</td><td>382,00 ₽</td><td class="up">+23,50</td></tr>
+            <tr><td>Продавец</td><td>367,50 ₽</td><td>367,50 ₽</td><td class="z">0</td></tr>
+            <tr><td>Покупатель, всего</td><td>2 659,00 ₽</td><td>2 649,00 ₽</td><td class="dn">−10,00</td></tr>
+            <tr class="tot"><td>Цепочка</td><td>753,50 ₽</td><td>789,00 ₽</td><td class="up">+35,50</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card be" style="padding:16px 18px;">
+        <div class="k">Безубыточность ПВЗ</div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-top:10px;">
+          <span class="v">39</span><span style="font-size:12px;color:#6B7280;font-weight:600;">оп/день</span>
+          <span style="font-size:11px;color:#6B7280;margin-left:auto;">при 30% mesh</span>
+        </div>
+        <div style="font-size:11px;color:#6B7280;margin-top:4px;line-height:1.4;">постоянные 1 200 ₽/день покрыты</div>
+        <div style="border-top:1px solid #E5E7EB;margin:10px 0 2px;"></div>
+        <div class="be-row"><span>Без бонуса, 0% mesh</span><b>44 оп/день</b></div>
+        <div class="be-row"><span>Пропускная способность</span><b>120 оп/день</b></div>
+        <div class="be-row"><span>Загрузка при 39 оп</span><b>33%</b></div>
+        <div style="font-size:11px;line-height:1.45;color:#6B7280;margin-top:8px;">Бонус снимает 5 операций из 44 — ПВЗ выходит в плюс раньше и без потери запаса мощности.</div>
+      </div>
+    </div>
   </div>
+
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>04 / 10</span></div>
 </section>
 
-<!-- 5 -->
+<!-- ============ 05 BOTTLENECKS ============ -->
 <section class="slide">
-  <div class="kicker">Устойчивость</div>
-  <h2>Партнёр окупается на трети мощности, очередь под контролем</h2>
-  <div class="body row">
-    <div class="card" style="flex:1;display:flex;flex-direction:column;gap:16px;">
-      <div class="big plum">39 <span style="font-size:24px;">оп/день</span></div>
-      <div style="font-weight:600;font-size:18px;">Безубыточность при 30% mesh</div>
-      <p class="muted" style="font-size:15px;line-height:1.5;">35 оп/день при 62%; фикс. 1 200 ₽/день, мощность 120.</p>
-      <div style="margin-top:auto;"><div style="height:6px;border-radius:999px;background:#E5E7EB;overflow:hidden;"><div style="width:32%;height:6px;border-radius:999px;background:#7B1E7A;"></div></div><div class="lbl" style="font-size:12px;margin-top:8px;">39 из 120 оп/день · 32%</div></div>
-    </div>
-    <div class="card" style="flex:1;display:flex;flex-direction:column;gap:16px;">
-      <div class="big plum">80–85%</div>
-      <div style="font-weight:600;font-size:18px;">Рабочий коридор очереди M/M/1</div>
-      <p class="muted" style="font-size:15px;line-height:1.5;">0,80–1,13 ч; выше 85% — авто-перелив в хаб.</p>
-      <div style="margin-top:auto;"><div style="height:6px;border-radius:999px;background:#E5E7EB;overflow:hidden;"><div style="width:85%;height:6px;border-radius:999px;background:#7B1E7A;"></div></div><div class="lbl" style="font-size:12px;margin-top:8px;">порог очереди M/M/1 · 85%</div></div>
-    </div>
-    <div class="card" style="flex:1;display:flex;flex-direction:column;gap:16px;">
-      <div class="big plum">21 → 52 <span style="font-size:24px;">дн</span></div>
-      <div style="font-weight:600;font-size:18px;">Срок хранения</div>
-      <p class="muted" style="font-size:15px;line-height:1.5;">На 21-й день алерт и перемещение за 60 ₽; на 52-й день хранение обнуляет прибыль продавца.</p>
-      <div style="margin-top:auto;"><div style="height:6px;border-radius:999px;background:#E5E7EB;overflow:hidden;"><div style="width:40%;height:6px;border-radius:999px;background:#7B1E7A;"></div></div><div class="lbl" style="font-size:12px;margin-top:8px;">21 из 52 дней хранения · 40%</div></div>
+  <div class="kicker">Узкие места</div>
+  <h2>Пять узких мест — <span class="n">пять правил</span>, которые уже работают в коде</h2>
+
+  <div class="body">
+    <table class="bott">
+      <thead>
+        <tr><th></th><th>Узкое место</th><th>Правило</th><th>Механика и цифра</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="idx">01</td>
+          <td class="pain">Полупустые рейсы: курьер едет за одним заказом</td>
+          <td class="fix"><b>Плотность + скоринг SKU ≥ 60</b></td>
+          <td class="mech">Веса: оборачиваемость <b>0,45</b> · спрос <b>0,35</b> · габарит <b>0,20</b>. В mesh попадает только то, что уйдёт за 3 дня.</td>
+        </tr>
+        <tr>
+          <td class="idx">02</td>
+          <td class="pain">Лишние остановки: маршрут «через весь город»</td>
+          <td class="fix"><b>Слоты выдачи + матрица расстояний</b></td>
+          <td class="mech">Рейс собирается под окно выдачи; плечо считается по улицам с коэффициентом <b>1,3</b> к прямой.</td>
+        </tr>
+        <tr>
+          <td class="idx">03</td>
+          <td class="pain">Задержка курьера: SLA никому не принадлежит</td>
+          <td class="fix"><b>SLA + рейтинг ПВЗ A–D + штраф 50 ₽</b></td>
+          <td class="mech">A ≥ 98% · B ≥ 95% · C ≥ 90% · D ниже. Срыв SLA — <b>50 ₽</b> с виновного узла, а не с продавца.</td>
+        </tr>
+        <tr>
+          <td class="idx">04</td>
+          <td class="pain">Площадь и пики: очередь в зале, переполненные ячейки</td>
+          <td class="fix"><b>M/M/1, коридор 80–85%, автоперелив</b></td>
+          <td class="mech">Потолок сети <b>8 × 120 = 960</b> операций/день; выше 85% загрузки заказ автоматически уходит на хаб.</td>
+        </tr>
+        <tr>
+          <td class="idx">05</td>
+          <td class="pain">Возвраты и неликвид: товар мёртвым грузом в ячейке</td>
+          <td class="fix"><b>7 / 21 / 52 дня + вывоз 60 ₽</b></td>
+          <td class="mech">Возврат <b>7 дней</b>, алерт на <b>21-й</b>, вывоз за <b>60 ₽</b> до <b>52-го</b> — дня, когда прибыль продавца обнуляется.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="bound">
+      <div class="k" style="width:150px;">Границы отката</div>
+      <p>Если пара ПВЗ не проходит SLA или плотность ниже порога — заказ возвращается на хаб.
+        Маршрут пересчитывается заново, продавец и покупатель видят тот же срок 30 ч. <b>Откат не ломает экономику: мы теряем бонус, а не заказ.</b></p>
     </div>
   </div>
-  <div style="margin-top:16px;padding:12px 18px;background:#F5ECF5;border-radius:12px;font-size:16px;font-weight:600;color:#7B1E7A;">Малый объём → откат на хаб · простой курьера → SLA-окно и штраф 50 ₽</div>
+
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>05 / 10</span></div>
 </section>
 
-<!-- 6 -->
-<section class="slide">
-  <div class="kicker">Межгород и масштаб</div>
-  <h2>Адаптивный overflow спасает сеть при двойной перегрузке</h2>
-  <div class="body row">
-    <div class="card" style="width:430px;display:flex;flex-direction:column;gap:26px;">
-      <div style="font-weight:700;font-size:20px;">Межгород</div>
-      <p style="font-size:16px;line-height:1.5;color:#6B7280;">Предразмещение остатка в городе получателя: магистраль <b style="color:#111827">10,50 ₽</b>.</p>
-      <div class="row" style="gap:22px;flex-wrap:wrap;">
-        <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">+25,00 ₽</div><div class="lbl" style="margin-top:6px;">цепочка</div></div>
-        <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">−10 ₽</div><div class="lbl" style="margin-top:6px;">покупатель</div></div>
-        <div style="flex:1;"><div style="font-size:30px;font-weight:700;" class="green">3 ч</div><div class="lbl" style="margin-top:6px;">срок</div></div>
+<!-- ============ 06 STRESS ============ -->
+<section class="slide dark">
+  <div class="kicker">Стресс-тест</div>
+  <h2>Наивный mesh утонул в пике: <span class="n">2 000 опозданий</span>. Overflow 85% срезал половину</h2>
+
+  <div class="body">
+    <div class="sgrid">
+      <div class="panels">
+        <div class="panel">
+          <div class="k">Опоздания, заказов</div>
+          <svg viewBox="0 0 340 104" aria-label="Опоздания">
+            <g font-family="system-ui, sans-serif">
+              <text x="0" y="26" font-size="11" fill="#9CA3AF">Наивный</text>
+              <rect x="72" y="10" width="190" height="24" rx="3" fill="#4A1F2A" stroke="#B91C1C"/>
+              <text x="340" y="28" font-size="14" font-weight="700" fill="#FCA5A5" text-anchor="end">2 000</text>
+              <text x="0" y="80" font-size="11" fill="#9CA3AF">Overflow</text>
+              <rect x="72" y="64" width="90" height="24" rx="3" fill="#4C1D95" stroke="#A855F7"/>
+              <text x="340" y="82" font-size="14" font-weight="700" fill="#E9D5FF" text-anchor="end">953</text>
+            </g>
+          </svg>
+          <div class="pnote"><b style="color:#34D399;">−52,4%</b> — но каждый второй заказ всё ещё опаздывает</div>
+        </div>
+
+        <div class="panel">
+          <div class="k">Загрузка сети, %</div>
+          <svg viewBox="0 0 340 104" aria-label="Загрузка сети">
+            <g font-family="system-ui, sans-serif">
+              <text x="0" y="26" font-size="11" fill="#9CA3AF">Наивный</text>
+              <rect x="72" y="10" width="190" height="24" rx="3" fill="#4A1F2A" stroke="#B91C1C"/>
+              <text x="340" y="28" font-size="14" font-weight="700" fill="#FCA5A5" text-anchor="end">226%</text>
+              <text x="0" y="80" font-size="11" fill="#9CA3AF">Overflow</text>
+              <rect x="72" y="64" width="114" height="24" rx="3" fill="#4C1D95" stroke="#A855F7"/>
+              <text x="340" y="82" font-size="14" font-weight="700" fill="#E9D5FF" text-anchor="end">136%</text>
+            </g>
+          </svg>
+          <div class="pnote"><b style="color:#34D399;">−40%</b> — но до рабочего коридора 85% ещё далеко</div>
+        </div>
+
+        <div class="panel">
+          <div class="k">Маржа маркетплейса</div>
+          <svg viewBox="0 0 340 104" aria-label="Маржа маркетплейса">
+            <g font-family="system-ui, sans-serif">
+              <text x="0" y="26" font-size="11" fill="#9CA3AF">Наивный</text>
+              <rect x="72" y="10" width="114" height="24" rx="3" fill="#4A1F2A" stroke="#B91C1C"/>
+              <text x="340" y="28" font-size="14" font-weight="700" fill="#FCA5A5" text-anchor="end">6,13%</text>
+              <text x="0" y="80" font-size="11" fill="#9CA3AF">Overflow</text>
+              <rect x="72" y="64" width="190" height="24" rx="3" fill="#4C1D95" stroke="#A855F7"/>
+              <text x="340" y="82" font-size="14" font-weight="700" fill="#E9D5FF" text-anchor="end">10,17%</text>
+            </g>
+          </svg>
+          <div class="pnote"><b style="color:#34D399;">+4,04 п.п.</b> — маржа остаётся двузначной в пике</div>
+        </div>
+
+        <div class="panel">
+          <div class="k">Себестоимость, ₽/заказ</div>
+          <svg viewBox="0 0 340 104" aria-label="Себестоимость заказа">
+            <g font-family="system-ui, sans-serif">
+              <text x="0" y="26" font-size="11" fill="#9CA3AF">Наивный</text>
+              <rect x="72" y="10" width="164" height="24" rx="3" fill="#4A1F2A" stroke="#B91C1C"/>
+              <text x="340" y="28" font-size="14" font-weight="700" fill="#FCA5A5" text-anchor="end">107,15</text>
+              <text x="0" y="80" font-size="11" fill="#9CA3AF">Overflow</text>
+              <rect x="72" y="64" width="190" height="24" rx="3" fill="#4C1D95" stroke="#A855F7"/>
+              <text x="340" y="82" font-size="14" font-weight="700" fill="#E9D5FF" text-anchor="end">124,12</text>
+            </g>
+          </svg>
+          <div class="pnote"><b style="color:#FCA5A5;">+16,97 ₽</b> — честная цена соблюдения SLA</div>
+        </div>
       </div>
-      <p style="font-size:15px;line-height:1.5;color:#6B7280;border-top:1px solid #E5E7EB;padding-top:16px;">МП +13,00 ₽ (прибыль 371,50 ₽) · нет остатка — честный откат на хаб.</p>
-    </div>
-    <div class="card" style="flex:1;padding:24px 24px 8px;">
-      <div style="font-weight:700;font-size:20px;margin-bottom:10px;">2 000 заказов/день, seed 42</div>
-      <table style="font-size:16px;">
-        <thead><tr><th>Метрика</th><th>Наивный mesh</th><th class="d">Overflow 85%</th></tr></thead>
-        <tbody>
-          <tr><td>Опоздания</td><td>2 000</td><td style="color:#059669;font-weight:600;">953</td></tr>
-          <tr><td>Макс. загрузка</td><td>226%</td><td style="color:#059669;font-weight:600;">136%</td></tr>
-          <tr><td>Отмены</td><td>671</td><td style="color:#059669;font-weight:600;">336</td></tr>
-          <tr><td>Потери отмен</td><td>710,1 тыс. ₽</td><td style="color:#059669;font-weight:600;">354,7 тыс. ₽</td></tr>
-          <tr><td>Маржа МП</td><td>6,13%</td><td style="color:#059669;font-weight:600;">10,17%</td></tr>
-          <tr><td style="border-bottom:0">Доставка</td><td style="border-bottom:0">107,15 ₽</td><td class="d" style="border-bottom:0;color:#111827">124,12 ₽</td></tr>
-        </tbody>
-      </table>
+
+      <div class="card ctx">
+        <div class="k">Условия прогона</div>
+        <div class="row"><span>Заказов в симуляции</span><b>2 000</b></div>
+        <div class="row"><span>Seed</span><b>42</b></div>
+        <div class="row"><span>Потолок сети</span><b>8 × 120 = 960</b></div>
+        <div class="row"><span>Коридор перелива</span><b>85%</b></div>
+        <div class="row"><span>Перелив на хаб</span><b>746 заказов</b></div>
+        <div class="note">Перелив — управляемый отказ: <b>746 заказов уходят на хаб</b> и едут 30 ч, но город не встаёт,
+          а маржа маркетплейса остаётся двузначной.</div>
+        <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.14);padding-top:12px;">
+          <div class="k">Вывод</div>
+          <div style="font-size:13px;line-height:1.45;color:#E5E7EB;margin-top:6px;">Без перелива mesh нарушает SLA на <b style="color:#FCA5A5;">100% заказов</b>.
+            С переливом — на 48%, и это дешевле любого «идеального» расписания.</div>
+        </div>
+      </div>
     </div>
   </div>
+
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>06 / 10</span></div>
 </section>
 
-<!-- 7 -->
+<!-- ============ 07 ARCHITECTURE ============ -->
 <section class="slide">
-  <div class="kicker">Архитектура и стенд</div>
-  <h2>Работающий MVP в одном Docker-контуре</h2>
-  <div class="body row">
-    <div class="col" style="width:540px;gap:20px;">
-      <div class="card" style="padding:20px;">
-        <svg viewBox="0 0 490 190" width="100%">
-          <g font-family="Inter,sans-serif" text-anchor="middle">
-            <rect x="1" y="1" width="488" height="48" rx="10" fill="#fff" stroke="#E5E7EB" stroke-width="2"/>
-            <text x="245" y="31" font-size="15" font-weight="600" fill="#111827">UI Vanilla JS + nginx</text>
-            <rect x="1" y="71" width="488" height="48" rx="10" fill="#F5ECF5" stroke="#7B1E7A" stroke-width="2"/>
-            <text x="245" y="101" font-size="15" font-weight="600" fill="#7B1E7A">FastAPI · 40 эндпоинтов, RBAC</text>
-            <rect x="1" y="141" width="238" height="48" rx="10" fill="#fff" stroke="#E5E7EB" stroke-width="2"/>
-            <text x="120" y="171" font-size="13" font-weight="600" fill="#111827">SQLite WAL + BEGIN IMMEDIATE</text>
-            <rect x="251" y="141" width="238" height="48" rx="10" fill="#fff" stroke="#E5E7EB" stroke-width="2"/>
-            <text x="370" y="171" font-size="14" font-weight="600" fill="#111827">Economics Engine</text>
-            <g stroke="#9CA3AF" stroke-width="2"><path d="M245 51V69"/><path d="M120 121V139"/><path d="M370 121V139"/></g>
-          </g>
-        </svg>
+  <div class="kicker">Архитектура MVP</div>
+  <h2>Четыре слоя, <span class="n">40 путей</span> OpenAPI и <span class="n">171</span> зелёный тест</h2>
+
+  <div class="body">
+    <div style="display:grid;grid-template-columns:1fr 452px;gap:22px;flex:1;min-height:0;">
+      <div class="stack">
+        <div class="layer">
+          <div class="ln">UI</div>
+          <div class="tt"><b>Интерфейсы</b><span>то, что видит человек</span></div>
+          <div class="tags"><i>кабинет ПВЗ</i><i>кабинет продавца</i><i>карта сети</i><i>демо-кокпит</i></div>
+        </div>
+        <div class="layer">
+          <div class="ln">API</div>
+          <div class="tt"><b>FastAPI</b><span>контракт и валидация</span></div>
+          <div class="tags"><i>40 путей</i><i>OpenAPI 3.1</i><i>pydantic-схемы</i><i>идемпотентность</i></div>
+        </div>
+        <div class="layer core" style="flex-direction:column;align-items:stretch;gap:8px;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div class="ln">CORE</div>
+            <div class="tt"><b>Ядро решений</b><span>вся логика здесь</span></div>
+            <div class="tags" style="margin-left:auto;"><i>маршрутизатор</i><i>скоринг SKU</i><i>очередь M/M/1</i><i>ledger</i></div>
+          </div>
+          <div style="font-size:11.5px;line-height:1.45;color:#6B7280;padding-left:46px;">
+            Двойная запись денег: каждая операция — две проводки, баланс сходится до копейки. Любой сбой узла откатывается целиком.
+          </div>
+        </div>
+        <div class="layer">
+          <div class="ln">DATA</div>
+          <div class="tt"><b>Хранение и запуск</b><span>один docker compose</span></div>
+          <div class="tags"><i>SQLite</i><i>миграции</i><i>Docker</i><i>CI-прогон тестов</i></div>
+        </div>
       </div>
-      <div class="row" style="gap:12px;">
-        <div class="card" style="flex:1;padding:16px;"><div style="font-size:24px;font-weight:700;" class="plum">5/5</div><div class="lbl">сценариев ТЗ</div></div>
-        <div class="card" style="flex:1;padding:16px;"><div style="font-size:24px;font-weight:700;" class="plum">171</div><div class="lbl">автотест · CI green</div></div>
-        <div class="card" style="flex:1;padding:16px;"><div style="font-size:20px;font-weight:700;white-space:nowrap;" class="plum">9 точек · 80% mesh</div><div class="lbl">5 заказов · логистика 270 ₽</div></div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;min-height:0;">
+        <div class="card ws real" style="flex:1;">
+          <h3 class="green">Работает по-настоящему</h3>
+          <ul>
+            <li>API на 40 путей, живой OpenAPI</li>
+            <li>Маршрутизация, слоты, матрица расстояний</li>
+            <li>Очередь M/M/1 и автоперелив при 85%</li>
+            <li>Скоринг SKU и раскладка по ячейкам</li>
+            <li>Возвраты 7 дней, инциденты и эвакуация узла</li>
+            <li>Ledger двойной записи, P&amp;L четырёх сторон</li>
+            <li>171 автотест, все зелёные</li>
+          </ul>
+        </div>
+        <div class="card ws stub">
+          <h3 class="muted">Честные заглушки</h3>
+          <ul>
+            <li>Хаб и магистраль — консолидированные ставки, без расписания рейсов</li>
+            <li>Платёжный шлюз — заглушка, реальные деньги не двигаются</li>
+            <li>Курьеры — модель задержек, не реальные люди с телефонами</li>
+          </ul>
+        </div>
       </div>
     </div>
-    <div class="win" style="flex:1;"><div class="bar"><i></i><i></i><i></i><span>localhost:5173</span></div><img src="../screenshots/01-dashboard.png" alt=""></div>
   </div>
+
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>07 / 10</span></div>
 </section>
 
-<!-- 8 -->
+<!-- ============ 08 DEMO ============ -->
 <section class="slide">
-  <div class="kicker">Нештатные ситуации</div>
-  <h2>Товар не теряется при отказе ПВЗ, клиент видит реальный срок</h2>
-  <div class="body row">
-    <div class="col" style="width:560px;gap:20px;justify-content:center;">
-      <div class="item"><div class="num">1</div><div><b>Отказ узла + split-эвакуация</b><p>Партия делится (parent_batch_id), заказы переадресуются.</p></div></div>
-      <div class="item"><div class="num">2</div><div><b>Возврат и длительное хранение</b><p>Виртуальные часы ускоряют сценарии до срока 21 и 52 дней.</p></div></div>
-      <div class="item"><div class="num">3</div><div><b>Скоринг размещения SKU</b><p>Выбор между mesh_pvz и hub по экономике.</p></div></div>
-      <div class="item"><div class="num">4</div><div><b>Сверка остатков и SLA-рейтинг A–D</b><p>Резервы, ячейки и ledger сходятся; пункты получают рейтинг.</p></div></div>
+  <div class="kicker">Живое демо</div>
+  <h2>Пять сценариев, которые можно нажать: <span class="n">от 3 часов</span> до 52-го дня</h2>
+
+  <div class="body">
+    <div class="demo-grid">
+      <div class="card dcard">
+        <svg viewBox="0 0 40 40" fill="none" stroke="#7B1E7A" stroke-width="1.7">
+          <circle cx="9" cy="10" r="3.4"/><circle cx="31" cy="10" r="3.4"/><circle cx="20" cy="31" r="3.4"/>
+          <path d="M12.2 10h15.6M10.6 13.2l7.6 15.2M29.4 13.2l-7.6 15.2"/>
+        </svg>
+        <div class="dn">01</div>
+        <h3>Городской mesh</h3>
+        <p>Заказ идёт ПВЗ → ПВЗ: скоринг, слот, рейс. В карте видно, как посылка минует хаб.</p>
+        <div class="metric">90 ₽ · 3 ч</div>
+      </div>
+
+      <div class="card dcard">
+        <svg viewBox="0 0 40 40" fill="none" stroke="#7B1E7A" stroke-width="1.7">
+          <circle cx="20" cy="20" r="4"/>
+          <path d="M20 16V6M20 24v10M16 20H6M24 20h10M17 17L10 10M23 23l7 7M23 17l7-7M17 23l-7 7"/>
+          <circle cx="20" cy="6" r="2.2"/><circle cx="34" cy="20" r="2.2"/><circle cx="20" cy="34" r="2.2"/><circle cx="6" cy="20" r="2.2"/>
+        </svg>
+        <div class="dn">02</div>
+        <h3>Хаб и магистраль</h3>
+        <p>Неходовой SKU не проходит скоринг и уезжает привычным маршрутом. Сравнение стоимости рядом.</p>
+        <div class="metric">135,50 ₽ · 30 ч</div>
+      </div>
+
+      <div class="card dcard">
+        <svg viewBox="0 0 40 40" fill="none" stroke="#7B1E7A" stroke-width="1.7">
+          <path d="M31 20a11 11 0 1 1-4.2-8.6"/><path d="M31 8v6h-6"/>
+          <path d="M15 16h10M15 21h7M15 26h4" stroke-linecap="round"/>
+        </svg>
+        <div class="dn">03</div>
+        <h3>Возврат 7 дней</h3>
+        <p>Покупатель возвращает товар — ledger пересчитывает обе стороны, обратная логистика 60&nbsp;₽.</p>
+        <div class="metric">−60 ₽ · пересчёт P&amp;L</div>
+      </div>
+
+      <div class="card dcard">
+        <svg viewBox="0 0 40 40" fill="none" stroke="#7B1E7A" stroke-width="1.7">
+          <circle cx="10" cy="20" r="4"/><circle cx="30" cy="20" r="4"/>
+          <path d="M14.5 18.5l4-4M25.5 18.5l-4-4" stroke="#DC2626"/>
+          <path d="M22 12l6 8M28 12l-6 8" stroke="#DC2626"/>
+          <path d="M6 30c4 4 24 4 28 0" stroke-dasharray="3 3"/>
+        </svg>
+        <div class="dn">04</div>
+        <h3>Сбой узла</h3>
+        <p>ПВЗ падает: остаток эвакуируется в соседний, заказы перепривязываются, узел восстанавливается.</p>
+        <div class="metric">эвакуация + восстановление</div>
+      </div>
+
+      <div class="card dcard">
+        <svg viewBox="0 0 40 40" fill="none" stroke="#7B1E7A" stroke-width="1.7">
+          <circle cx="20" cy="21" r="13"/><path d="M20 21V11M20 21l7 4"/>
+          <path d="M20 4v3M20 35v3M4 21h3M33 21h3"/>
+          <circle cx="20" cy="21" r="1.6" fill="#7B1E7A"/>
+        </svg>
+        <div class="dn">05</div>
+        <h3>Долгое хранение</h3>
+        <p>День 21 — алерт продавцу. День 52 — прибыль ноль, предлагаем вывоз за 60 ₽ в другой ПВЗ.</p>
+        <div class="metric">21 / 52 дня</div>
+      </div>
     </div>
-    <div class="col" style="flex:1;gap:12px;">
-      <div class="win" style="flex:1;"><div class="bar"><i></i><i></i><i></i><span>localhost:5173</span></div><img src="../screenshots/06-buyer.png" alt=""></div>
-      <div class="lbl">Карточка покупателя: 19 049 ₽, токен без перебора</div>
+
+    <div class="demo-badge">
+      <b>Живой API · 171 автотест · экран ПВЗ · экран продавца</b>
+      <span>Каждый сценарий — реальный запрос, а не записанное видео</span>
     </div>
   </div>
+
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>08 / 10</span></div>
 </section>
 
-<!-- 9 -->
+<!-- ============ 09 PILOT ============ -->
 <section class="slide">
-  <div class="kicker">Честно о границах</div>
-  <h2>Границы прототипа и дорожная карта</h2>
-  <div class="body row">
-    <div class="card" style="width:420px;display:flex;flex-direction:column;gap:16px;">
-      <div style="font-weight:700;font-size:20px;">Заглушки и границы MVP</div>
-      <div class="item"><div class="num" style="background:#FEF2F2;color:#DC2626;">!</div><div><b style="font-size:16px;">Хаб, магистраль, платёжный шлюз</b><p>Имитация, помечена в интерфейсе.</p></div></div>
-      <div class="item"><div class="num" style="background:#FEF2F2;color:#DC2626;">!</div><div><b style="font-size:16px;">Синтетические тарифы</b><p>Параметры модели, не прайс RWB.</p></div></div>
-      <div class="item"><div class="num" style="background:#FEF2F2;color:#DC2626;">!</div><div><b style="font-size:16px;">Демо-ключи и SQLite</b><p>Один писатель, ключи не являются секретами.</p></div></div>
-    </div>
-    <div class="col" style="flex:1;gap:16px;">
-      <div class="card item" style="align-items:center;"><div class="num">1</div><div><b>Пилот 30 дней</b><p>8 ПВЗ Йошкар-Олы, 288 тыс. ₽. Цели: ≥40% локальных пар, p95 ≤12 ч; stop — p95 выше 24 ч два дня подряд.</p></div></div>
-      <div class="card item" style="align-items:center;"><div class="num">2</div><div><b>Продакшн-ядро</b><p>PostgreSQL, OIDC, аудит, очереди, бэкапы и SLA.</p></div></div>
-      <div class="card item" style="align-items:center;"><div class="num">3</div><div><b>Тиражирование</b><p>Склады, платежи, новые города.</p></div></div>
+  <div class="kicker">Пилот и масштабирование</div>
+  <h2>30 дней, <span class="n">8 ПВЗ</span> Йошкар-Олы — со стоп-критерием, заданным заранее</h2>
+
+  <div class="body">
+    <div class="pilot-grid">
+      <div class="card pcol">
+        <h3>Бизнес-пилот</h3>
+        <div class="facts">
+          <div class="fact"><b>30</b><span>дней, один город</span></div>
+          <div class="fact"><b>8</b><span>ПВЗ в контуре</span></div>
+          <div class="fact"><b>≥ 60</b><span>скоринг: только ходовые SKU</span></div>
+          <div class="fact"><b>&lt; 30%</b><span>городских пар — стоп</span></div>
+        </div>
+
+        <svg viewBox="0 0 520 86" style="display:block;width:100%;height:auto;margin:14px 0 4px;" aria-label="План пилота по дням">
+          <g font-family="system-ui, sans-serif">
+            <line x1="44" y1="34" x2="476" y2="34" stroke="#E5E7EB" stroke-width="2"/>
+            <line x1="44" y1="34" x2="476" y2="34" stroke="#7B1E7A" stroke-width="2" stroke-dasharray="4 4" opacity=".45"/>
+            <g fill="#FFFFFF" stroke="#7B1E7A" stroke-width="2">
+              <circle cx="44" cy="34" r="5"/><circle cx="150" cy="34" r="5"/><circle cx="300" cy="34" r="5"/><circle cx="476" cy="34" r="5"/>
+            </g>
+            <g font-size="10.5" fill="#6B7280" text-anchor="middle">
+              <text x="44" y="18">День 0</text><text x="150" y="18">День 7</text><text x="300" y="18">День 21</text><text x="476" y="18">День 30</text>
+            </g>
+            <g font-size="9.5" fill="#9CA3AF" text-anchor="middle">
+              <text x="44" y="54">включение</text><text x="150" y="54">первые рейсы</text><text x="300" y="54">алерт склада</text><text x="476" y="54">ревью KPI</text>
+            </g>
+            <text x="44" y="78" font-size="10" fill="#7B1E7A" font-weight="600">KPI: доля mesh · скорость выдачи · маржа МП · утилизация ПВЗ</text>
+          </g>
+        </svg>
+
+        <div class="stop">
+          <b>Stop-критерий: доля mesh ниже 30% городских пар</b>
+          <p>Тогда сеть не набирает плотность, рейсы полупустые — выключаем и возвращаемся на хаб. Решение принимаем по данным, а не по вере.</p>
+        </div>
+      </div>
+
+      <div class="card pcol">
+        <h3>Техническое масштабирование</h3>
+        <div class="k" style="margin-top:10px;">Что меняем при выходе из пилота</div>
+        <ul class="slist">
+          <li><b>PostgreSQL вместо SQLite</b> — конкурентные записи, реплика на чтение</li>
+          <li><b>OIDC вместо локальных токенов</b> — роли ПВЗ, продавца и оператора</li>
+          <li><b>Бэкапы и restore-прогон</b> — цель RPO 15 мин, проверка восстановления</li>
+          <li><b>Метрики и трассировка</b> — задержка API, очередь, доля перелива</li>
+          <li><b>Отказоустойчивость</b> — health-check узлов, деградация на хаб</li>
+          <li><b>Горизонтальный рост</b> — stateless-ядро, 10× нагрузка без переписывания</li>
+        </ul>
+        <div style="margin-top:auto;padding-top:12px;border-top:1px solid #F1F2F4;display:flex;gap:16px;">
+          <div><div class="k">Сейчас</div><div style="font-size:19px;font-weight:700;margin-top:3px;">1 город · 8 ПВЗ</div></div>
+          <div style="margin-left:auto;text-align:right;"><div class="k">Цель</div><div style="font-size:19px;font-weight:700;margin-top:3px;">10× без смены ядра</div></div>
+        </div>
+      </div>
     </div>
   </div>
+
   <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>09 / 10</span></div>
 </section>
 
-<!-- 10 -->
-<section class="slide dark" style="justify-content:center;align-items:center;text-align:center;gap:28px;">
-  <h1 style="font-size:84px;">В 10 раз быстрее<br>внутри города</h1>
-  <p style="font-size:26px;color:#9CA3AF;">Не нужны новые склады — нужны точки, которые уже стоят</p>
-  <div class="row" style="gap:14px;margin-top:8px;">
-    <span class="badge">−27 ч покупателю</span><span class="badge">+12 ₽ ПВЗ</span><span class="badge">52% экономии — маркетплейсу</span><span class="badge">5/5 сценариев и 171 тест</span>
+<!-- ============ 10 FINAL ============ -->
+<section class="slide dark">
+  <div class="kicker">Итоги</div>
+  <h2>Четыре числа, за которые мы отвечаем</h2>
+
+  <div class="body" style="justify-content:space-between;">
+    <div class="anchors">
+      <div class="anchor">
+        <div class="ak" style="color:#C084FC;">Логистика</div>
+        <div class="v">−33,6%</div>
+        <div class="d">себестоимость 90,00 ₽ вместо 135,50 ₽ — минус 45,50 ₽ с заказа</div>
+      </div>
+      <div class="anchor">
+        <div class="ak" style="color:#C084FC;">Скорость</div>
+        <div class="v">3 ч</div>
+        <div class="d">вместо 30 ч — вместе с приёмкой, сортировкой и выдачей</div>
+      </div>
+      <div class="anchor">
+        <div class="ak" style="color:#34D399;">Доля маркетплейса</div>
+        <div class="v">51,6%</div>
+        <div class="d">экономии остаётся WB после выплат ПВЗ — чистыми</div>
+      </div>
+      <div class="anchor">
+        <div class="ak" style="color:#34D399;">Устойчивость</div>
+        <div class="v">10,17%</div>
+        <div class="d">маржа МП в стрессе на 2 000 заказов вместо 6,13%</div>
+      </div>
+    </div>
+
+    <div class="pull">Хаб не умирает — он перестаёт возить то, что можно <b>передать через дорогу</b>.</div>
+
+    <div class="crew">
+      <div class="member"><b>Меркушев Михаил</b><span>капитан · архитектура, бэкенд-ядро, Docker/CI</span></div>
+      <div class="member"><b>Казаков Евгений</b><span>бэкенд · маршрутизация, отказ узлов, автотесты</span></div>
+      <div class="member"><b>Родионова Дарья</b><span>экономика · модель P&amp;L, симуляция, пилот</span></div>
+      <div class="member"><b>Степанова Татьяна</b><span>фронтенд · карта сети, демо-кокпит, презентация</span></div>
+    </div>
+
+    <div class="cta">
+      <span class="dot"></span>
+      <b>Готовы к живому демо (2 мин) и вопросам жюри</b>
+      <span>RWB Mesh · ПГТУ · Йошкар-Ола</span>
+    </div>
   </div>
-  <div style="font-size:15px;color:#9CA3AF;margin-top:20px;line-height:1.7;">Меркушев Михаил · Казаков Евгений · Родионова Дарья · Степанова Татьяна<br>ПГТУ, Йошкар-Ола</div>
-  <div style="font-size:20px;font-weight:600;color:#F9FAFB;">Спасибо. Переходим к живому демо</div>
+
+  <div class="foot"><span>RWB Mesh · ПВЗ как узлы сети</span><span>10 / 10</span></div>
 </section>
 
 </body>

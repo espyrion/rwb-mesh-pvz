@@ -342,7 +342,7 @@ async function renderPvz() {
         <div><h3>Ёмкость</h3><div class="metric small">${pvz.used_cells} / ${pvz.capacity_cells}</div><div class="hint">свободно ${pvz.free_cells} ячеек</div></div>
         <div><h3>Загрузка</h3><div class="metric small">${dec(pvz.utilization_pct)}%</div><div class="bar ${alertPct !== null && pvz.utilization_pct >= alertPct ? "warn" : ""}"><span style="width:${Math.min(100, pvz.utilization_pct)}%"></span></div>
           <div class="hint">${alertPct === null ? "порог предупреждения: нет данных" : "порог предупреждения " + dec(alertPct) + "%"}</div></div>
-        <div><h3>Прибыль за период</h3><div class="metric small ${analytics.profit_rub >= 0 ? "good" : "bad"}">${money(analytics.profit_rub)}</div><div class="hint">ledger ${money(analytics.ledger_net_rub)} − операции ${money(analytics.op_costs_modeled_rub)} − постоянные ${money(analytics.fixed_costs_modeled_rub)}</div></div>
+        <div><h3>Прибыль за период</h3><div class="metric small ${analytics.profit_rub >= 0 ? "good" : "bad"}">${money(analytics.profit_rub)}</div><div class="hint">ledger ${money(analytics.ledger_net_rub)} − операции ${money(analytics.op_costs_modeled_rub)} − постоянные ${money(analytics.fixed_costs_modeled_rub)}<br>Безубыточность: ${model.breakeven ? model.breakeven.ops : "?"} оп/день (мощность ${model.breakeven ? model.breakeven.capacity_ops : "?"}). Выдано заказов за период: ${analytics.orders_issued}. Точка окупается при масштабе, а не на единичных заказах.</div></div>
         <div><h3>Хранение</h3><div class="metric small">${money(analytics.revenue.storage || 0)}</div><div class="hint">${analytics.storage_cell_days} ячейко-дней</div></div>
       </div>
       <div class="grid cols-3 mt">

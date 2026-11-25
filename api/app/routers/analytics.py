@@ -70,14 +70,36 @@ def analytics_pvz(
     )
 
     # Постоянные затраты ПВЗ (аренда/ФОТ) не видны в ledger, но без них прибыль фиктивна.
+    # Период по умолчанию считаем от первого движения по ledger этого ПВЗ, а не от clock.START:
+    # иначе после прокрутки виртуальных часов аренда набегает за весь простой стенда,
+    # хотя ПВЗ фактически работал лишь несколько дней.
+    if date_from:
+        period_start = datetime.fromisoformat(date_from)
+    else:
+        first_ts = (
+            db.query(Ledger.ts)
+            .filter(Ledger.party == "pvz", Ledger.party_id == pvz_id)
+            .order_by(Ledger.ts.asc(), Ledger.id.asc())
+            .first()
+        )
+        period_start = first_ts[0] if first_ts else None
     now_ts = clock.now(db)
-    start_ts = datetime.fromisoformat(date_from) if date_from else clock.START
     end_ts = (datetime.fromisoformat(date_to) + timedelta(days=1)) if date_to else now_ts
-    period_days = max(1, (end_ts - start_ts).days)
-    fixed_cost = round(float(p("pvz", "fixed_cost_day_rub", default=1200)) * period_days, 2)
+    if period_start is None or end_ts < period_start:
+        # ПВЗ ещё не имел движений (или окно целиком до первого движения) — постоянных затрат нет.
+        period_days = 0
+        fixed_cost = 0.0
+    else:
+        period_days = max(1, (end_ts - period_start).days)
+        fixed_cost = round(float(p("pvz", "fixed_cost_day_rub", default=1200)) * period_days, 2)
     return {
         "pvz": pvz_dict(pvz),
-        "period": {"from": date_from, "to": date_to, "days": period_days},
+        "period": {
+            "from": date_from,
+            "to": date_to,
+            "days": period_days,
+            "effective_from": period_start.date().isoformat() if period_start else None,
+        },
         "revenue": {k: round(v, 2) for k, v in sorted(revenue.items())},
         "revenue_total_rub": round(sum(revenue.values()), 2),
         "deductions": {k: round(v, 2) for k, v in sorted(deductions.items())},

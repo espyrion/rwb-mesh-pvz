@@ -32,7 +32,7 @@ RULES: list[tuple[str, str, set[str]]] = [
     ("POST", r"^/pvz/\d+/audit$", {"pvz", ADMIN}),
     ("POST", r"^/catalog/placement-score$", {"seller", ADMIN}),
     ("POST", r"^/edge", {ADMIN}),          # /edges/{id}/disable|enable
-    ("POST", r"^/clock/advance$", {ADMIN}),
+    ("POST", r"^/clock/(advance|reset)$", {ADMIN}),
     ("POST", r"^/incidents/\d+/resolve$", {"pvz", ADMIN}),
 ]
 
