@@ -164,34 +164,103 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 и отдают `X-Total-Count`. Покупатель получает ссылку вида `/?track=<токен>` — публичный поиск идёт
 только по случайному токену, последовательный `ORD-00001` для этого не принимается.
 
-## Запуск без Docker
+## Запуск без Docker (только Python, без зависимостей кроме pip)
 
-Нужен только Python 3.11+ (в контейнерах используется 3.12; на 3.14 тоже работает). API импортирует
-пакет `economics/` из корня репозитория, поэтому **запускать нужно с `PYTHONPATH=..`** (или `PYTHONPATH=.`
-из корня) — иначе uvicorn упадёт с `ModuleNotFoundError: No module named 'economics'`.
+Этот путь не требует Docker вообще: нужен лишь Python 3.11+ (в контейнерах 3.12; проверено на 3.14)
+и интернет один раз — для `pip install`. Всё остальное лежит в репозитории.
+
+Проверено с нуля: чистая копия репозитория, пустой `venv`, пустая база — API, UI, создание заказа
+и тесты работают.
+
+### 1. Проверить Python
+
+```bash
+python3 --version    # нужен 3.11 или новее
+```
+
+Если Python нет: Windows — [python.org/downloads](https://www.python.org/downloads/) (при установке
+отметить **Add python.exe to PATH**); macOS — `brew install python@3.12`; Debian/Ubuntu —
+`sudo apt install python3 python3-venv python3-pip`.
+
+### 2. Создать окружение и поставить пакеты
+
+Из корня репозитория:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r api/requirements.txt
+```
 
+В Windows вместо `.venv/bin/` — `.venv\Scripts\`:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\pip install -r api\requirements.txt
+```
+
+Зависимостей мало: FastAPI, uvicorn, SQLAlchemy, PyYAML, pytest, httpx. Docker, Node.js и nginx
+не нужны.
+
+### 3. Запустить API
+
+Два терминала не обязательны, но удобны — API и UI работают параллельно.
+
+```bash
 cd api
 PYTHONPATH=.. DATABASE_URL=sqlite:///../mesh.db ../.venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-* `PYTHONPATH=..` — чтобы `import economics` находился, когда рабочий каталог `api/`.
-* `DATABASE_URL=sqlite:///../mesh.db` — база создастся в корне репозитория рядом с `api/`.
-  Абсолютный путь тоже работает: `DATABASE_URL=sqlite:////tmp/mesh.db`.
+В Windows (PowerShell) переменные задаются иначе:
+
+```powershell
+cd api
+$env:PYTHONPATH=".."; $env:DATABASE_URL="sqlite:///../mesh.db"; ..\.venv\Scripts\uvicorn app.main:app --reload --port 8000
+```
+
+Что означают переменные:
+
+* `PYTHONPATH=..` — обязательно. API импортирует пакет `economics/` из корня репозитория; без этого
+  uvicorn падает с `ModuleNotFoundError: No module named 'economics'`.
+* `DATABASE_URL=sqlite:///../mesh.db` — база создастся файлом `mesh.db` в корне репозитория.
+  Абсолютный путь тоже работает: `sqlite:////tmp/mesh.db`.
 * Миграций нет: при старте таблицы создаются и заполняются сидом, если база пустая.
-* Остановить — Ctrl+C. Перезапустить с чистой базой — удалить `mesh.db`.
+* `--reload` — перезапуск при правке кода; для простого просмотра можно убрать.
 
-UI в таком режиме не поднимется: `web/src/index.html` открыть напрямую нельзя — странице нужен
-прокси на API (`/api/`, `/health`, `/docs`), и его даёт только nginx из образа `web`, который ходит
-на хост `api:8000` внутри compose-сети. Поэтому варианта два:
+Проверка: `curl http://localhost:8000/health` → `{"status":"ok"}`. Swagger —
+http://localhost:8000/docs.
 
-* **нужен UI** — запускайте всё в Docker (раздел «Первый запуск» выше), uvicorn без Docker
-  используйте для API-отладки, а страницу открывайте на :5173;
-* **нужен только API** (Swagger, тесты, пробы curl) — uvicorn на :8000 без Docker полностью
-  достаточен, `http://localhost:8000/docs` работает.
+### 4. Запустить UI (второй терминал)
+
+Фронтенд обращается к относительному `/api/v1`, поэтому открыть `web/src/index.html` напрямую
+или отдать каталог через `python -m http.server` нельзя — запросы к API уйдут в никуда. В репозитории
+есть замена nginx на стандартной библиотеке Python:
+
+```bash
+python3 scripts/serve_dev.py
+```
+
+Скрипт отдаёт `web/src` и проксирует `/api/`, `/health`, `/docs`, `/openapi.json` в API. Открыть
+**http://localhost:5173** — интерфейс заработает полностью, включая запись (оформление заказа,
+переходы статусов).
+
+Порт и адрес API переопределяются переменными:
+
+```bash
+PORT=8080 API_URL=http://127.0.0.1:8001 python3 scripts/serve_dev.py
+```
+
+Если нужен только API (Swagger, `curl`, тесты) — этот шаг пропустите, uvicorn на :8000 достаточен.
+
+### 5. Остановить и сбросить
+
+Ctrl+C в каждом терминале. Сбросить состояние — удалить `mesh.db` (и `mesh.db-wal`/`mesh.db-shm`,
+если есть): следующий запуск создаст базу и сид заново.
+
+### Чего в этом режиме нет
+
+* **HTTPS и внешний доступ** — сервер слушает только `127.0.0.1`, снаружи не виден.
+* **Кэша и gzip** — nginx в Docker-варианте отдаёт статику быстрее; для разработки разница незаметна.
+* **Проверки `node --check` для JS** — это делает CI, локально Node.js не требуется.
 
 ## Переменные окружения
 
@@ -407,7 +476,7 @@ python3 scripts/record_demo.py     # то же + docs/demo-backup.mp4 (реал�
 * [docs/CONTRIBUTORS.md](docs/CONTRIBUTORS.md) — вклад участников и история коммитов.
 * [docs/demo-backup.mp4](docs/demo-backup.mp4) — backup-видео: реальный прогон `scripts/demo.py` (1:59, в пределах требования 1–3 минуты, включая ссылку покупателю).
 * [docs/openapi.json](docs/openapi.json) — машинночитаемая OpenAPI-схема (40 путей, схемы ответов и `ApiKey`).
-* `scripts/backup_db.py` — резервная копия SQLite без остановки API; `scripts/run_tests.sh` — все проверки.
+* `scripts/backup_db.py` — резервная копия SQLite без остановки API; `scripts/run_tests.sh` — все проверки; `scripts/serve_dev.py` — UI без Docker (статика `web/src` + прокси на API).
 
 ## Лицензия
 
