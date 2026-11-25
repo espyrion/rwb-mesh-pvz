@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>RWB Mesh · ЧП1</title>
+<style>
+@page { size: 1280px 720px; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #F8F9FA; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111827; font-variant-numeric: tabular-nums; }
+.slide { position: relative; width: 1280px; height: 720px; overflow: hidden; padding: 56px 56px 72px; background: #F8F9FA; page-break-after: always; break-after: page; display: flex; flex-direction: column; }
+.slide:last-child { page-break-after: auto; break-after: auto; }
+.dark { background: #0B0D14; color: #F9FAFB; }
+.dark::before { content: ""; position: absolute; right: -240px; top: -260px; width: 900px; height: 900px; background: radial-gradient(circle, rgba(123,30,122,0.28) 0%, rgba(123,30,122,0) 65%); }
+.dark > * { position: relative; }
+.muted { color: #6B7280; } .dark .muted { color: #9CA3AF; }
+.foot { position: absolute; left: 56px; right: 56px; bottom: 28px; display: flex; justify-content: space-between; font-size: 12px; color: #6B7280; border-top: 1px solid #E5E7EB; padding-top: 10px; }
+.tag { font-size: 13px; letter-spacing: .14em; font-weight: 600; color: #D8A8D7; }
+.kicker { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #7B1E7A; margin-bottom: 12px; }
+h1 { font-size: 76px; line-height: 1.04; font-weight: 700; letter-spacing: -.03em; }
+h2 { font-size: 36px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; max-width: 1050px; }
+.card { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; padding: 24px; }
+.row { display: flex; gap: 24px; } .col { display: flex; flex-direction: column; gap: 24px; }
+.body { flex: 1; margin-top: 24px; min-height: 0; }
+.big { font-size: 64px; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+.lbl { font-size: 14px; color: #6B7280; }
+.green { color: #059669; } .red { color: #DC2626; } .plum { color: #7B1E7A; }
+.pill { display: inline-block; background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; border-radius: 999px; padding: 10px 18px; font-weight: 600; font-size: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 18px; }
+th { background: #F3F4F6; text-align: left; font-size: 13px; font-weight: 600; color: #6B7280; padding: 12px 16px; text-transform: uppercase; letter-spacing: .06em; }
+td { padding: 14px 16px; border-bottom: 1px solid #E5E7EB; }
+th:not(:first-child), td:not(:first-child) { text-align: right; }
+td.d { color: #059669; font-weight: 600; } th.d { color: #059669; }
+tr.b td { font-weight: 700; background: #FAFAFB; }
+.badge { border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 12px 22px; font-size: 18px; font-weight: 600; color: #F9FAFB; }
+.tight td, .tight th { padding: 10px 14px; font-size: 15px; }
+.tfix { table-layout: fixed; }
+</style>
+</head>
+<body>
+
+<!-- СЛАЙД 1 -->
+<section class="slide dark">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 28px;">
+    <span class="badge">ЧЕКПОИНТ 1 · ТОП ИИ СТАРТ</span>
+    <span class="tag">RWB MESH · ПВЗ Как Узлы Сети</span>
+  </div>
+
+  <h1>Доставка внутри города<br>без магистрали</h1>
+  <p class="muted" style="font-size:22px; margin-top:18px; max-width:820px;">
+    Сегодня заказ внутри одного города едет через хаб: <span style="color:#F9FAFB;">30 часов</span> и <span style="color:#F9FAFB;">135,50 ₽</span>, из них <span style="color:#F9FAFB;">22 часа</span> — на магистрали.
+  </p>
+
+  <div class="row" style="margin-top:auto;">
+    <div class="card" style="flex:1;">
+      <div class="lbl">Себестоимость доставки</div>
+      <div class="big green">−33,6%</div>
+      <div class="lbl" style="margin-top:6px;">135,50 → 90 ₽</div>
+    </div>
+    <div class="card" style="flex:1;">
+      <div class="lbl">Маржа МП на пике</div>
+      <div class="big plum">5,75% → 10,00%</div>
+      <div class="lbl" style="margin-top:6px;">2000 заказов / день</div>
+    </div>
+    <div class="card" style="flex:1;">
+      <div class="lbl">Безубыточность ПВЗ</div>
+      <div class="big green">38 оп/день</div>
+      <div class="lbl" style="margin-top:6px;">при 30% mesh из мощности 120</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>Команда: Меркушев Михаил · Казаков Евгений · Родионова Дарья · Степанова Татьяна — ПГТУ, Йошкар-Ола</span>
+    <span>01 / 04</span>
+  </div>
+</section>
+
+<!-- СЛАЙД 2 -->
+<section class="slide">
+  <div class="kicker">Фокус и механика</div>
+  <h2>Два направления из шести + сценарий ПВЗ → ПВЗ</h2>
+
+  <div class="body row">
+    <div class="col" style="flex:1.35;gap:16px;">
+      <div class="card" style="padding:20px;">
+        <div class="lbl" style="margin-bottom:12px;">Выбранные направления (2 из 6)</div>
+        <div style="font-size:19px;font-weight:600;">1 · Тарифная модель и мотивация 4 сторон</div>
+        <div class="muted" style="font-size:15px;margin-top:2px;">+ контур хранения и возвратов</div>
+        <div style="font-size:19px;font-weight:600;margin-top:10px;">2 · Маршрутизация с ограничениями, пиками и сбоями</div>
+      </div>
+      <div class="card" style="padding:20px;">
+        <div class="lbl" style="margin-bottom:10px;">Границы ухода в хаб</div>
+        <ul style="list-style:none;font-size:16px;line-height:1.65;">
+          <li>· нет остатка в городе → хаб</li>
+          <li>· загрузка ПВЗ &gt; 85% → авто-перелив в хаб</li>
+          <li>· хранение &gt; 21 дня → алерт + перемещение за 60 ₽</li>
+        </ul>
+      </div>
+      <div class="card" style="padding:20px;background:#F5ECF5;">
+        <div style="font-size:27px;font-weight:700;color:#7B1E7A;">45,50 = 30 + 15 + 0,50</div>
+        <div class="muted" style="font-size:15px;margin-top:8px;">30 ₽ покупателю · 15 ₽ ПВЗ · 0,50 ₽ МП <span style="opacity:.7;">(выплаты ПВЗ вычтены)</span></div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;gap:16px;">
+      <div class="card" style="padding:20px;">
+        <div class="lbl" style="margin-bottom:12px;">Схема</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="border:1px solid #E5E7EB;border-radius:10px;padding:10px 16px;font-weight:600;font-size:17px;">ПВЗ А</span>
+          <span style="color:#059669;flex:1;text-align:center;font-weight:700;font-size:18px;">90 ₽ · 3 ч</span>
+          <span style="border:1px solid #E5E7EB;border-radius:10px;padding:10px 16px;font-weight:600;font-size:17px;">ПВЗ Б</span>
+        </div>
+        <div class="muted" style="font-size:15px;margin-top:12px;">город — напрямую (mesh), межгород — через хаб</div>
+      </div>
+      <div class="card tight" style="padding:12px 16px;">
+        <table>
+          <tr><th>Сторона</th><th>Было</th><th>Стало</th><th class="d">Δ</th></tr>
+          <tr><td>Покупатель</td><td>2659 ₽ · 30 ч</td><td>2629 ₽ · 3 ч</td><td class="d">−30 ₽</td></tr>
+          <tr><td>ПВЗ</td><td>27,50 ₽</td><td>42,50 ₽</td><td class="d">+15 ₽</td></tr>
+          <tr><td>Маркетплейс</td><td>358,50 ₽</td><td>359,00 ₽</td><td class="d">+0,50 ₽</td></tr>
+          <tr><td>Продавец</td><td>367,50 ₽</td><td>367,50 ₽</td><td>0</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>RWB Mesh · ПВЗ как узлы сети</span>
+    <span>02 / 04</span>
+  </div>
+</section>
+
+<!-- СЛАЙД 3 -->
+<section class="slide">
+  <div class="kicker">Риски логистики и ПВЗ</div>
+  <h2>Узкое место → правило в модели</h2>
+
+  <div class="body">
+    <table class="tfix tight">
+      <colgroup><col style="width:33%"><col style="width:67%"></colgroup>
+      <tr><th>Узкое место</th><th>Правило в модели</th></tr>
+      <tr><td>Малый объём / полупустые рейсы</td><td>Порог плотности локального спроса + скоринг SKU — mesh только на оборотных городских товарах, иначе хаб</td></tr>
+      <tr><td>Лишние остановки машины</td><td>Консолидация в короткие городские слоты между соседними ПВЗ + матрица расстояний</td></tr>
+      <tr><td>Задержка сборки / выноса курьеру</td><td>SLA-окно готовности партии до курьера + SLA-рейтинг ПВЗ (A–D) + штраф <span class="red">50 ₽</span></td></tr>
+      <tr><td>Площадь подсобки / вечерние пики</td><td>Лимит ячеек + очередь M/M/1 (коридор 80–85%), выше — авто-перелив в хаб, выдача не блокируется</td></tr>
+      <tr><td>Возвраты / неликвид</td><td>7-дневный возврат с пересчётом ledger, алерт на 21-й день, вывоз за <span class="red">60 ₽</span> до обнуления прибыли продавца (52 дня)</td></tr>
+    </table>
+  </div>
+
+  <div class="foot">
+    <span>RWB Mesh · ПВЗ как узлы сети</span>
+    <span>03 / 04</span>
+  </div>
+</section>
+
+<!-- СЛАЙД 4 -->
+<section class="slide">
+  <div class="kicker">Критерий успеха, план, роли</div>
+  <h2>Что считаем успехом и как дойдём</h2>
+
+  <div class="body">
+    <div class="row">
+      <div class="col" style="flex:1;">
+        <div class="card">
+          <div class="lbl" style="margin-bottom:10px;">Критерий успеха</div>
+          <ul style="list-style:none; font-size:17px; line-height:1.8;">
+            <li>· все 4 стороны не в минусе</li>
+            <li>· срок доставки ≤ 4 ч</li>
+            <li>· безубыточность ПВЗ ≤ 40 оп/день</li>
+            <li>· на пике 2000 заказов опоздания падают минимум вдвое</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="lbl" style="margin-bottom:10px;">План</div>
+          <ul style="list-style:none; font-size:17px; line-height:1.8;">
+            <li>· <strong>К ЧП2 (26.11 12:00):</strong> рабочий MVP со встроенной финмоделью + 5 сценариев</li>
+            <li>· <strong>К финалу (14:45):</strong> стресс-тест + план пилота на 8 ПВЗ + защита</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="flex:1;">
+        <div class="lbl" style="margin-bottom:10px;">Роли команды</div>
+        <table>
+          <tr><th>Участник</th><th>Роль</th></tr>
+          <tr><td>Меркушев Михаил</td><td>капитан · архитектура · бэкенд-ядро · Docker/CI</td></tr>
+          <tr><td>Казаков Евгений</td><td>маршрутизация и устойчивость · тесты · OpenAPI-контракт</td></tr>
+          <tr><td>Родионова Дарья</td><td>экономика и аналитика · модель 4 сторон · симуляция</td></tr>
+          <tr><td>Степанова Татьяна</td><td>фронтенд и UX · презентация</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>RWB Mesh · ПВЗ как узлы сети</span>
+    <span>04 / 04</span>
+  </div>
+</section>
+
+</body>
+</html>
