@@ -43,20 +43,20 @@ def test_city_order_four_parties():
     params = load_params()
     mesh = order_economics(params, kind="mesh", goods_rub=2500, cells=1, storage_days=3)
     assert mesh["route"]["cost_rub"] == 90.0 and mesh["route"]["hours"] == 3.0
-    # ПВЗ: 25 операция + 15 хранение + 15 бонус; затраты 8 приёмка + 12 сборка.
-    assert mesh["pvz"]["revenue_total"] == 55.0
-    assert mesh["pvz"]["profit_rub"] == 35.0
-    # МП: 300 комиссия + 129 доставка + 60 удержание продавца + 15 хранение.
-    # Затраты: 90 логистика + 15 хранение ПВЗ + 25 вознаграждение + 15 бонус.
-    assert mesh["marketplace"]["revenue_total"] == 504.0
-    assert mesh["marketplace"]["profit_rub"] == 359.0
+    # ПВЗ: 25 операция + 15 хранение + 12 бонус; затраты 8 приёмка + 12 сборка.
+    assert mesh["pvz"]["revenue_total"] == 52.0
+    assert mesh["pvz"]["profit_rub"] == 32.0
+    # МП: 300 комиссия + 149 доставка + 60 удержание продавца + 15 хранение.
+    # Затраты: 90 логистика + 15 хранение ПВЗ + 25 вознаграждение + 12 бонус.
+    assert mesh["marketplace"]["revenue_total"] == 524.0
+    assert mesh["marketplace"]["profit_rub"] == 382.0
     # Продавец: 2500 − 1750 закупка − 300 комиссия − 15 хранение − 60 логистика.
     assert mesh["seller"]["revenue_total"] == 2500.0
     assert mesh["seller"]["costs_total"] == 2125.0
     assert mesh["seller"]["profit_rub"] == 375.0
     assert mesh["seller"]["margin_pct"] == 15.0
-    assert mesh["buyer"]["total_rub"] == 2629.0
-    assert mesh["chain"]["profit_rub"] == 769.0
+    assert mesh["buyer"]["total_rub"] == 2649.0
+    assert mesh["chain"]["profit_rub"] == 789.0
 
 
 def test_hub_order_four_parties():
@@ -92,14 +92,14 @@ def test_compare_within_acceptance():
     base = order_economics(params, kind="hub", goods_rub=2500, cells=1, storage_days=3)
     mesh = order_economics(params, kind="mesh", goods_rub=2500, cells=1, storage_days=3)
     result = compare(params, base, mesh)
-    assert result["buyer_delta_rub"] == -30.0
-    assert result["buyer_delta_pct"] == -1.13
+    assert result["buyer_delta_rub"] == -10.0
+    assert result["buyer_delta_pct"] == -0.38
     assert result["buyer_delta_hours"] == -27.0
     assert result["buyer_delta_hours_pct"] == -90.0
-    assert result["pvz_delta_rub"] == 15.0
-    assert result["marketplace_delta_rub"] == 0.5
+    assert result["pvz_delta_rub"] == 12.0
+    assert result["marketplace_delta_rub"] == 23.5
     assert result["seller_delta_rub"] == 0.0
-    assert result["chain_delta_rub"] == 15.5
+    assert result["chain_delta_rub"] == 35.5
     assert result["chain_more_profitable"] is True
     assert result["buyer_acceptance"]["within_cost"] is True
     assert result["buyer_acceptance"]["within_time"] is True
@@ -112,27 +112,27 @@ def test_intercity_mesh():
     mesh = intercity["mesh"]
     base = intercity["base"]
     assert mesh["route"]["cost_rub"] == 100.5 and mesh["route"]["hours"] == 3.0
-    assert mesh["buyer"]["total_rub"] == 2629.0
-    assert mesh["marketplace"]["profit_rub"] == 348.5  # 359 − 10,5 магистрали
-    assert mesh["pvz"]["profit_rub"] == 35.0
+    assert mesh["buyer"]["total_rub"] == 2649.0
+    assert mesh["marketplace"]["profit_rub"] == 371.5  # 382 − 10,5 магистрали
+    assert mesh["pvz"]["profit_rub"] == 32.0
     assert mesh["seller"]["profit_rub"] == 375.0
-    assert mesh["chain"]["profit_rub"] == 758.5
+    assert mesh["chain"]["profit_rub"] == 778.5
     cmp = intercity["compare"]
-    assert cmp["buyer_delta_rub"] == -30.0
+    assert cmp["buyer_delta_rub"] == -10.0
     assert cmp["buyer_delta_hours"] == -27.0
-    assert cmp["marketplace_delta_rub"] == -10.0
-    assert cmp["chain_delta_rub"] == 5.0
+    assert cmp["marketplace_delta_rub"] == 13.0
+    assert cmp["chain_delta_rub"] == 25.0
     assert cmp["chain_more_profitable"] is True
     assert base["chain"]["profit_rub"] == 753.5
 
 
-def test_pvz_breakeven_38_ops():
+def test_pvz_breakeven_39_ops():
     params = load_params()
-    low = pvz_pnl(params, days=1, ops=37, qty=37, storage_cell_days=37 * 1.5 * 3, mesh_ops=11)
-    ok = pvz_pnl(params, days=1, ops=38, qty=38, storage_cell_days=38 * 1.5 * 3, mesh_ops=11)
+    low = pvz_pnl(params, days=1, ops=38, qty=38, storage_cell_days=38 * 1.5 * 3, mesh_ops=11)
+    ok = pvz_pnl(params, days=1, ops=39, qty=39, storage_cell_days=39 * 1.5 * 3, mesh_ops=12)
     assert low["profit_rub"] < 0
     assert ok["profit_rub"] >= 0
-    assert pvz_breakeven_ops(params, mesh_share=0.3) == 38
+    assert pvz_breakeven_ops(params, mesh_share=0.3) == 39
 
 
 def test_storage_breakeven_is_seller_margin():
@@ -143,7 +143,7 @@ def test_storage_breakeven_is_seller_margin():
 
 def test_buyer_cost_formula():
     params = load_params()
-    assert buyer_cost(params, goods_rub=1000, kind="mesh")["total_rub"] == 1129.0
+    assert buyer_cost(params, goods_rub=1000, kind="mesh")["total_rub"] == 1149.0
     assert buyer_cost(params, goods_rub=1000, kind="hub")["total_rub"] == 1159.0
 
 
@@ -152,14 +152,14 @@ def test_sensitivity_and_chain_breakeven():
     rows = share_sensitivity(params)
     shares = params["network"]["sensitivity_mesh_share_pct"]
     assert [row["share_pct"] for row in rows] == shares
-    assert rows[0]["chain_per_order_rub"] == 755.83  # 753,5 + 15% × 15,5
-    assert rows[-1]["chain_per_order_rub"] == 764.35
-    assert rows[0]["network_chain_rub"] == 377_912.5
-    assert rows[0]["pvz_breakeven_ops"] == 41
-    assert rows[-1]["pvz_breakeven_ops"] == 32
+    assert rows[0]["chain_per_order_rub"] == 758.83  # 753,5 + 15% × 35,5
+    assert rows[-1]["chain_per_order_rub"] == 778.35
+    assert rows[0]["network_chain_rub"] == 379_412.5
+    assert rows[0]["pvz_breakeven_ops"] == 42
+    assert rows[-1]["pvz_breakeven_ops"] == 34
     breakeven = chain_breakeven_share(params)
     assert breakeven["share_pct"] == 0.0
-    assert breakeven["chain_delta_per_order_rub"] == 15.5
+    assert breakeven["chain_delta_per_order_rub"] == 35.5
 
 
 def test_queue_grows_faster_than_load():

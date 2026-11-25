@@ -79,7 +79,7 @@ def test_report_incident_row_computed_from_model():
 # 3) Формулировки «прибыльнее / не ограничивает долю / приемлема» — по факту.
 def test_report_viable_word_follows_compare():
     params = deepcopy(_params())
-    params["pvz"]["op_fee_rub"] = 400.0  # маржа МП на заказ уходит в минус
+    params["pvz"]["op_fee_rub"] = 500.0  # маржа МП на заказ уходит в минус
     text = build(params)
     assert "viable = False" in text
     assert "не приемлема" in text
@@ -105,7 +105,7 @@ def test_report_unreachable_breakeven_is_not_zero():
 # 5) Штраф больше маржи МП: доля маржи не считается.
 def test_report_penalty_over_margin():
     params = deepcopy(_params())
-    params["pvz"]["op_fee_rub"] = 400.0  # маржа МП < штрафа
+    params["pvz"]["op_fee_rub"] = 500.0  # маржа МП < штрафа
     text = build(params)
     assert "штраф превышает маржу" in text
 

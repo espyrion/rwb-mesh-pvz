@@ -23,7 +23,7 @@ def test_report_sections_and_numbers():
         assert section in text
     assert "135,50" in text  # стоимость схемы через хаб
     assert "90,00" in text
-    assert "38" in text  # порог загрузки ПВЗ
+    assert "39" in text  # порог загрузки ПВЗ
     assert "не являются действующими тарифами" in text
     assert "mesh" in text and "viable = True" in text
 
