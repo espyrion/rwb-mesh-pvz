@@ -623,10 +623,48 @@ def write_report(path: str, results: dict, health: dict, passed: int) -> None:
         fh.write("\n".join(out))
 
 
-def main() -> int:
+USAGE = """\
+Запуск: python3 scripts/demo.py [--write-report PATH]
+
+  --write-report PATH   сохранить отчёт о прогоне (например docs/SCENARIOS_REPORT.md)
+Переменные окружения: API_URL (по умолчанию http://localhost:8000), MESH_API_KEY, WEB_URL.
+"""
+
+
+def parse_args(argv: list[str]) -> tuple[str | None, str | None]:
+    """Разбирает --write-report безопасно: без значения — подсказка вместо IndexError.
+
+    Возвращает (путь отчёта или None, текст ошибки или None).
+    """
     report_path = None
-    if "--write-report" in sys.argv:
-        report_path = sys.argv[sys.argv.index("--write-report") + 1]
+    index = 0
+    while index < len(argv):
+        arg = argv[index]
+        if arg == "--write-report":
+            if index + 1 >= len(argv) or argv[index + 1].startswith("-"):
+                return None, "--write-report требует путь к файлу отчёта"
+            report_path = argv[index + 1]
+            index += 2
+            continue
+        if arg.startswith("--write-report="):
+            value = arg.split("=", 1)[1]
+            if not value.strip():
+                return None, "--write-report требует путь к файлу отчёта"
+            report_path = value
+            index += 1
+            continue
+        if arg in ("-h", "--help"):
+            print(USAGE, end="")
+            raise SystemExit(0)
+        return None, f"неизвестный аргумент: {arg}"
+    return report_path, None
+
+
+def main() -> int:
+    report_path, error = parse_args(sys.argv[1:])
+    if error is not None:
+        print(f"{error}\n\n{USAGE}", file=sys.stderr)
+        return 2
     try:
         with urllib.request.urlopen(ROOT + "/health", timeout=10) as response:
             health = json.loads(response.read().decode())

@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: api/Dockerfile
     container_name: mesh-api
+    # После падения контейнер поднимается сам; остановка вручную (docker compose stop) уважается.
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
@@ -24,6 +26,8 @@ services:
   web:
     build: ./web
     container_name: mesh-web
+    # Отдельный healthcheck web не нужен: nginx отдаёт статику, отказ виден в docker compose ps.
+    restart: unless-stopped
     ports:
       - "5173:80"
     depends_on:

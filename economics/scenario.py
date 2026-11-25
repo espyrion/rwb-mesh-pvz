@@ -55,14 +55,25 @@ def with_overrides(
     return data
 
 
-def pvz_breakeven_ops(params: dict, *, mesh_share: float = 0.3, max_ops: int = 2000) -> int | None:
+def pvz_breakeven_ops(
+    params: dict,
+    *,
+    mesh_share: float = 0.3,
+    max_ops: int = 2000,
+    storage_days: float | None = None,
+) -> int | None:
     """Сколько операций в день нужно ПВЗ, чтобы выйти в ноль.
 
     Считаем тем же pvz_pnl, что и отчёт: постоянные расходы за день, ячейко-дни
     хранения по среднему сроку, доля заказов без хаба — mesh_share.
+    storage_days — срок хранения ползунка сценария (по умолчанию типовой).
     """
     cells = float(params["pvz"]["avg_cells_per_order"])
-    days = float(params["scenario_defaults"]["storage_days_typical"])
+    days = float(
+        params["scenario_defaults"]["storage_days_typical"]
+        if storage_days is None
+        else storage_days
+    )
     for ops in range(1, max_ops + 1):
         result = pvz_pnl(
             params,
@@ -77,26 +88,39 @@ def pvz_breakeven_ops(params: dict, *, mesh_share: float = 0.3, max_ops: int = 2
     return None
 
 
-def storage_breakeven_days(params: dict, *, kind: str = "mesh", goods: float = 2500.0) -> float:
+def storage_breakeven_days(params: dict, *, kind: str = "mesh", goods: float = 2500.0) -> float | None:
     """Срок хранения, при котором прибыль продавца по заказу обнуляется.
 
     Хранение — перевод маркетплейсу/ПВЗ, поэтому маржа маркетплейса от срока не
     зависит; риск длительного хранения несёт продавец. Считаем, за сколько дней
     плата за хранение съедает его прибыль при нулевом сроке.
+
+    None — порог недостижим: тариф хранения нулевой (плата не растёт) либо
+    продавец уже в убытке при нулевом сроке (обнулять нечего).
     """
     cells = float(params["pvz"]["avg_cells_per_order"])
     rate = float(params["pvz"]["storage_rate_day_rub"])
     if rate <= 0:
-        return 0.0
+        return None
     base = order_economics(params, kind=kind, goods_rub=goods, cells=cells, storage_days=0.0)
     margin = base["seller"]["profit_rub"]
+    if margin <= 0:
+        return None
     return round(margin / (rate * cells), 2)
 
 
-def pvz_day(params: dict, *, ops: int, mesh_share: float) -> dict:
-    """P&L точки за один день при заданной загрузке."""
+def pvz_day(params: dict, *, ops: int, mesh_share: float, storage_days: float | None = None) -> dict:
+    """P&L точки за один день при заданной загрузке.
+
+    storage_days — средний срок хранения для ячейко-дней; по умолчанию
+    типовой срок из scenario_defaults (чтобы UI-ползунок срока доходил сюда).
+    """
     cells = float(params["pvz"]["avg_cells_per_order"])
-    days = float(params["scenario_defaults"]["storage_days_typical"])
+    days = float(
+        params["scenario_defaults"]["storage_days_typical"]
+        if storage_days is None
+        else storage_days
+    )
     result = pvz_pnl(
         params,
         days=1,
@@ -115,20 +139,35 @@ def pvz_day(params: dict, *, ops: int, mesh_share: float) -> dict:
     }
 
 
-def share_sensitivity(params: dict, *, orders: int | None = None) -> list[dict]:
+def share_sensitivity(
+    params: dict,
+    *,
+    orders: int | None = None,
+    goods: float | None = None,
+    storage_days: float | None = None,
+) -> list[dict]:
     """Экономика сети при доле локальных пар из params.yaml (шаг задан там же).
 
     Считается по заказу, а не по случайной выборке: средний чек и прибыль
     линейны по доле, поэтому это точная интерполяция двух схем, а не оценка.
     День ПВЗ считается тем же pvz_pnl при фиксированной загрузке.
+
+    goods и storage_days — значения ползунков сценария: без них таблица
+    считалась бы на типовом чеке и сроке, а ползунки на неё не влияли.
     """
     shares = [float(share) / 100.0 for share in params["network"]["sensitivity_mesh_share_pct"]]
     volume = int(params["network"]["sensitivity_orders"] if orders is None else orders)
     cells = float(params["pvz"]["avg_cells_per_order"])
-    days = float(params["scenario_defaults"]["storage_days_typical"])
-    goods = float(params["scenario_defaults"]["goods_price_rub"])
-    hub = order_economics(params, kind="hub", goods_rub=goods, cells=cells, storage_days=days)
-    mesh = order_economics(params, kind="mesh", goods_rub=goods, cells=cells, storage_days=days)
+    days = float(
+        params["scenario_defaults"]["storage_days_typical"]
+        if storage_days is None
+        else storage_days
+    )
+    goods_rub = float(
+        params["scenario_defaults"]["goods_price_rub"] if goods is None else goods
+    )
+    hub = order_economics(params, kind="hub", goods_rub=goods_rub, cells=cells, storage_days=days)
+    mesh = order_economics(params, kind="mesh", goods_rub=goods_rub, cells=cells, storage_days=days)
     ops = int(params["scenario_defaults"]["pvz_day_ops"])
     rows = []
     for share in shares:
@@ -144,25 +183,40 @@ def share_sensitivity(params: dict, *, orders: int | None = None) -> list[dict]:
                 "buyer_avg_rub": round(buyer, 2),
                 "chain_per_order_rub": round(chain, 2),
                 "network_chain_rub": round(chain * volume, 2),
-                "pvz_day_profit_rub": pvz_day(params, ops=ops, mesh_share=share)["profit_rub"],
-                "pvz_breakeven_ops": pvz_breakeven_ops(params, mesh_share=share),
+                "pvz_day_profit_rub": pvz_day(
+                    params, ops=ops, mesh_share=share, storage_days=days
+                )["profit_rub"],
+                "pvz_breakeven_ops": pvz_breakeven_ops(
+                    params, mesh_share=share, storage_days=days
+                ),
             }
         )
     return rows
 
 
-def chain_breakeven_share(params: dict) -> dict:
+def chain_breakeven_share(
+    params: dict, *, goods: float | None = None, storage_days: float | None = None
+) -> dict:
     """Точная доля локальных пар, при которой прибыль цепочки равна схеме «только хаб».
 
     Прибыль цепочки на заказ линейна по доле: hub + s × (mesh − hub). Если
     разница положительна, точка безубыточности — 0% (любой mesh-заказ выгоден);
     если отрицательна — 100% (mesh невыгоден вовсе).
+
+    goods и storage_days — значения ползунков: порог должен считаться на том же
+    чеке и сроке, что и таблица чувствительности, иначе ползунок его не двигает.
     """
     cells = float(params["pvz"]["avg_cells_per_order"])
-    days = float(params["scenario_defaults"]["storage_days_typical"])
-    goods = float(params["scenario_defaults"]["goods_price_rub"])
-    hub = order_economics(params, kind="hub", goods_rub=goods, cells=cells, storage_days=days)
-    mesh = order_economics(params, kind="mesh", goods_rub=goods, cells=cells, storage_days=days)
+    days = float(
+        params["scenario_defaults"]["storage_days_typical"]
+        if storage_days is None
+        else storage_days
+    )
+    goods_rub = float(
+        params["scenario_defaults"]["goods_price_rub"] if goods is None else goods
+    )
+    hub = order_economics(params, kind="hub", goods_rub=goods_rub, cells=cells, storage_days=days)
+    mesh = order_economics(params, kind="mesh", goods_rub=goods_rub, cells=cells, storage_days=days)
     delta = round(mesh["chain"]["profit_rub"] - hub["chain"]["profit_rub"], 2)
     share = 0.0 if delta > 0 else (1.0 if delta < 0 else 0.0)
     return {
@@ -239,9 +293,13 @@ def build_scenario(
     )
     cmp = compare(data, hub, mesh)
     intercity = intercity_economics(data, goods_rub=goods_rub, cells=cells, storage_days=days)
-    day = pvz_day(data, ops=day_ops, mesh_share=share)
-    breakeven = pvz_breakeven_ops(data, mesh_share=share)
+    day = pvz_day(data, ops=day_ops, mesh_share=share, storage_days=days)
+    breakeven = pvz_breakeven_ops(data, mesh_share=share, storage_days=days)
     queue = queue_load_table(data)
+    # Ползунки чека и срока хранения передаём аргументами, а не правкой
+    # глобальных params: иначе «что если» протекало бы между запросами API.
+    sensitivity = share_sensitivity(data, goods=goods_rub, storage_days=days)
+    chain_breakeven = chain_breakeven_share(data, goods=goods_rub, storage_days=days)
 
     return {
         "params": {
@@ -282,8 +340,8 @@ def build_scenario(
             "capacity_ops": int(data["pvz"]["ops_per_day_capacity"]),
         },
         "storage_breakeven_days": storage_breakeven_days(data, goods=goods_rub),
-        "sensitivity": share_sensitivity(data),
-        "chain_breakeven": chain_breakeven_share(data),
+        "sensitivity": sensitivity,
+        "chain_breakeven": chain_breakeven,
         "queue": queue,
         "queue_threshold": queue_threshold(data),
         "disclaimer": data["meta"]["disclaimer"],

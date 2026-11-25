@@ -30,6 +30,7 @@ import yaml
 HERE = Path(__file__).resolve().parent
 
 MESH_KINDS = {"mesh", "intercity_mesh"}
+ROUTE_KINDS = ("mesh", "hub", "intercity_mesh")
 
 
 def load_params(path: str | Path | None = None) -> dict:
@@ -41,6 +42,18 @@ def is_mesh(kind: str) -> bool:
     return kind in MESH_KINDS
 
 
+def _check_kind(kind: str) -> str:
+    """Неизвестный маршрут — ошибка, а не тихий расчёт «как через хаб».
+
+    Иначе опечатка в kind давала бы правдоподобные числа: buyer_delivery_fee
+    для любого не-mesh вида возвращала бы тариф хаба, а route_cost — его
+    себестоимость, и отчёт молча смешал бы схемы.
+    """
+    if kind not in ROUTE_KINDS:
+        raise ValueError(f"неизвестный kind={kind!r}; допустимые: {', '.join(ROUTE_KINDS)}")
+    return kind
+
+
 def route_cost(params: dict, kind: str) -> float:
     """Себестоимость логистики на заказ.
 
@@ -49,6 +62,7 @@ def route_cost(params: dict, kind: str) -> float:
     консолидированная магистраль в пересчёте на отправление.
     hub: обработка на хабе + магистраль + последняя миля.
     """
+    _check_kind(kind)
     lg = params["logistics"]
     if kind == "mesh":
         return float(lg["local_delivery_cost_rub"])
@@ -68,6 +82,7 @@ def route_hours(params: dict, kind: str) -> float:
     выдачи входит только локальный сегмент, иначе сравнение с hub было бы
     нечестным (там магистраль в сроке есть).
     """
+    _check_kind(kind)
     lg = params["logistics"]
     if kind == "mesh":
         return float(lg["local_delivery_hours"])
@@ -77,6 +92,7 @@ def route_hours(params: dict, kind: str) -> float:
 
 
 def buyer_delivery_fee(params: dict, kind: str) -> float:
+    _check_kind(kind)
     fees = params["fees"]
     return float(
         fees["buyer_delivery_fee_local_rub"] if is_mesh(kind) else fees["buyer_delivery_fee_hub_rub"]
@@ -259,7 +275,10 @@ def queue_wait_hours(params: dict, utilization: float) -> float:
     M/M/1 при ρ→1 заменена линейным участком осознанно: бесконечность в отчёте
     бесполезна, а порог 80–85% виден уже на гиперболе.
     """
-    cap = float(params["network"]["queue_cap_pct"]) / 100.0
+    cap_raw = float(params["network"]["queue_cap_pct"]) / 100.0
+    # cap ≥ 1 означал бы деление на ноль в M/M/1: зажимаем в (0, 1) даже
+    # если params.yaml пришёл мимо схемы (валидация ловит это отдельно).
+    cap = min(0.99, max(0.01, cap_raw))
     rho = max(0.0, float(utilization))
     if rho <= 0:
         return 0.0

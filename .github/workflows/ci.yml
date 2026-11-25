@@ -31,10 +31,8 @@ jobs:
           cache-dependency-path: api/requirements.txt
       - name: Install dependencies
         run: python -m pip install --upgrade pip && python -m pip install -r api/requirements.txt
-      - name: Pytest (SQLite в /tmp)
+      - name: "Pytest (временная SQLite из conftest.py)"
         working-directory: api
-        env:
-          DATABASE_URL: sqlite:////tmp/mesh-ci-api.db
         run: python -m pytest tests -q --tb=short
 
   economics:

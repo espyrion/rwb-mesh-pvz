@@ -45,7 +45,7 @@ created → routed → assembled → in_transit → issued → returned
 | POST | `/items/{id}/relocate` | перемещение остатка между ПВЗ одного города |
 | POST | `/catalog/placement-score` | скоринг размещения SKU: `mesh_pvz` или `hub` с причинами (роль seller/admin) |
 | POST | `/pvz/{id}/audit` | инвентаризация остатков: факт по партиям, корректировка, инцидент, удержание (роль pvz/admin) |
-| GET | `/ledger?order_id=&party=` | начисления (по заказу или стороне) |
+| GET | `/ledger?order_id=&viewer=` | начисления (по заказу или стороне; `viewer` — `pvz`/`marketplace`/`seller`/`buyer`) |
 
 ### Заказы
 | Метод | Путь | Описание |
@@ -78,8 +78,9 @@ created → routed → assembled → in_transit → issued → returned
 (закрыт, если нерешённых нет). Остатки при нехватке ёмкости не бросаются — открывается
 инцидент для оператора. `POST /pvz/{id}/enable` возвращает точку в граф.
 
-**Списки и пагинация.** `/orders`, `/items`, `/ledger` принимают `limit` (1…500) и `offset`; без `limit`
-отдаётся всё. Общее число подходящих строк — в заголовке `X-Total-Count`. Фильтры: у заказов `status`,
+**Списки и пагинация.** `/orders`, `/items`, `/ledger` принимают `limit` и `offset`; без `limit`
+отдаётся всё. Для `/orders` и `/items` предел `limit` — 1…500, для `/ledger` — 1…1000. Общее число
+подходящих строк — в заголовке `X-Total-Count`. Фильтры: у заказов `status`,
 `pvz_id` (источник или получатель), `code`; у остатков `pvz_id`, `status`, `seller_id`; у ledger —
 `order_id`, `viewer`, `party_id`, `kind`.
 
@@ -245,14 +246,20 @@ curl -X POST localhost:8000/api/v1/pvz/1/audit \
 ## Пример: сквозной заказ
 
 ```bash
-curl -X POST localhost:8000/api/v1/orders -H 'Content-Type: application/json' \
-  -d '{"item_id":1,"qty":1,"to_pvz_id":3}'
-# → order: routed, route.kind=mesh, cost 90, buyer_total 19029
+# 1. Заказ создаёт продавец (ключ роли seller); id заказа берём из ответа, а не зашиваем
+ORDER=$(curl -s -X POST localhost:8000/api/v1/orders \
+  -H 'Content-Type: application/json' -H 'X-API-Key: demo-seller-key' \
+  -d '{"item_id":1,"qty":1,"to_pvz_id":3}' |
+  python3 -c 'import json,sys; print(json.load(sys.stdin)["order"]["id"])')
+# → ответ содержит order (status=routed), route (kind=mesh, total_cost_rub=90) и comparison
 
-curl -X POST localhost:8000/api/v1/orders/1/assemble
-curl -X POST localhost:8000/api/v1/orders/1/issue
-curl localhost:8000/api/v1/ledger?order_id=1
-# → buyer −19029, seller 16632, pvz 40, marketplace 2267; сумма = −90
+# 2. Сборку и выдачу делает оператор ПВЗ (ключ роли pvz)
+curl -X POST localhost:8000/api/v1/orders/$ORDER/assemble -H 'X-API-Key: demo-pvz-key'
+curl -X POST localhost:8000/api/v1/orders/$ORDER/issue -H 'X-API-Key: demo-pvz-key'
+
+# 3. Проводки по заказу — чтение открыто, ключ не нужен
+curl "localhost:8000/api/v1/ledger?order_id=$ORDER"
+# → по сторонам: buyer −19 029, seller 16 632, pvz 40, marketplace 2 267; сумма = −90 (логистика)
 ```
 
 ## Ошибки

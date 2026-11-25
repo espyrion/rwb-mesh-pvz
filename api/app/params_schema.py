@@ -159,12 +159,14 @@ class Network(_Section):
     nodes: int = Field(gt=0, le=1000)
     overflow_utilization_threshold: float = Field(gt=0, lt=1)
     overload_delay_hours_per_100pct: float = Field(gt=0)
-    queue_cap_pct: float = Field(gt=0, le=100)
+    queue_cap_pct: float = Field(gt=0, lt=100)  # 100 → деление на ноль в M/M/1
     queue_base_ops: int = Field(ge=0)
     sensitivity_orders: int = Field(gt=0)
     simulation_orders: list[int] = Field(min_length=1)
     simulation_seed: int = Field(ge=0)
-    sensitivity_mesh_share_pct: list[float] = Field(min_length=1)
+    # Шаг таблицы чувствительности считается как разность двух соседних долей:
+    # одна точка даёт IndexError, поэтому минимум две.
+    sensitivity_mesh_share_pct: list[float] = Field(min_length=2)
     queue_extra_ops: list[int] = Field(min_length=1)
 
     @model_validator(mode="after")

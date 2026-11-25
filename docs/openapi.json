@@ -3427,6 +3427,7 @@
           },
           "price_rub": {
             "type": "number",
+            "maximum": 10000000.0,
             "minimum": 0.0,
             "title": "Price Rub",
             "default": 2500.0

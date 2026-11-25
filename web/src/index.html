@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <a class="skip-link" href="#page">Перейти к содержимому</a>
   <aside class="sidebar">
     <div class="brand">
       <div class="logo">M</div>
@@ -44,7 +45,7 @@
   <main>
     <header class="topbar">
       <div>
-        <h1 id="page-title">Дашборд</h1>
+        <h1 id="page-title" tabindex="-1">Дашборд</h1>
         <p id="page-subtitle" class="muted">Сводка по сети ПВЗ и денежным потокам</p>
       </div>
       <div class="topbar-actions">
@@ -53,10 +54,11 @@
       </div>
     </header>
 
-    <section id="page" class="page"></section>
+    <section id="page" class="page" tabindex="-1"></section>
   </main>
 
-  <div id="toast" class="toast" hidden></div>
+  <!-- Live-регион для сообщений: не hidden, иначе скринридер не объявит текст; скрыт визуально классом. -->
+  <div id="toast" class="toast is-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="app.js"></script>
   <script src="map.js"></script>
 </body>

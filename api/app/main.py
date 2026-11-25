@@ -6,10 +6,13 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+import math
+
+from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from .db import get_db, init_db
@@ -45,6 +48,27 @@ app = FastAPI(
     ),
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_handler(request: Request, exc: RequestValidationError):
+    """422 как обычно, но без эха inf/nan из входа: их нельзя сериализовать в JSON (иначе 500)."""
+    errors = []
+    for err in exc.errors():
+        err = dict(err)
+        value = err.get("input")
+        if isinstance(value, float) and not math.isfinite(value):
+            err["input"] = str(value)
+        errors.append(err)
+    return JSONResponse(status_code=422, content={"detail": jsonable(errors)})
+
+
+def jsonable(value):
+    """Привести ctx/ошибки к JSON-совместимому виду (исключения → строки)."""
+    from fastapi.encoders import jsonable_encoder
+
+    return jsonable_encoder(value, custom_encoder={Exception: str})
+
 
 app.add_middleware(
     CORSMiddleware,

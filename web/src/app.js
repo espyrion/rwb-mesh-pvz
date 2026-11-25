@@ -20,7 +20,6 @@ const state = {
   mapOrderId: null,
   mapFailure: null,
   econ: {},
-  econBase: null,
   econData: null,
   econReady: false,
   score: null,
@@ -77,11 +76,61 @@ async function api(path, options = {}) {
 let toastTimer = null;
 function toast(message, kind = "") {
   const box = $("#toast");
+  if (!box) return;
   box.textContent = message;
+  /* Скрываем классом, а не hidden: live-регион должен оставаться в дереве доступности. */
   box.className = "toast " + kind;
-  box.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (box.hidden = true), 6000);
+  toastTimer = setTimeout(() => box.classList.add("is-hidden"), 6000);
+}
+
+/* ---------- защита от повторной отправки ---------- */
+/* Пока запрос в полёте, кнопка (или кнопка отправки формы) выключена.
+   Двойной клик по «Оформить» не должен создавать второй POST /orders. */
+const busyNodes = new WeakSet();
+
+/* Для формы блокируем именно кнопку отправки: disabled у самой формы не мешает
+   повторному submit. */
+function busyTarget(node) {
+  if (!node) return null;
+  if (node.tagName === "FORM") return node.querySelector('button[type="submit"]');
+  return node;
+}
+
+async function withBusy(node, task) {
+  const target = busyTarget(node);
+  if (!target) return await task();
+  if (busyNodes.has(target)) return null;
+  busyNodes.add(target);
+  const wasDisabled = target.disabled;
+  target.disabled = true;
+  target.setAttribute("aria-busy", "true");
+  try {
+    return await task();
+  } finally {
+    busyNodes.delete(target);
+    target.disabled = wasDisabled;
+    target.removeAttribute("aria-busy");
+  }
+}
+
+/* Обновление справочников после действия: сбой загрузки не должен приводить
+   к unhandledrejection и к падению экрана. */
+async function refreshAfterAction() {
+  try {
+    await loadCatalog();
+    render();
+  } catch (error) {
+    toast("данные не обновлены — нажмите Обновить", "error");
+  }
+}
+
+/* Ошибки API приходят на английском (например, «Not Found»): в интерфейсе покупателя
+   показываем понятный русский текст. */
+function trackErrorMessage(message) {
+  const text = String(message || "").trim();
+  if (!text || /not found|404/i.test(text)) return "заказ с таким кодом не найден";
+  return text;
 }
 
 async function guard(promise, okMessage) {
@@ -175,7 +224,7 @@ async function renderDashboard() {
       <td class="num">${dec(row.utilization_pct)}%</td>
     </tr>`;
   });
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="grid cols-4">${cards
       .map((c) => `<div class="card"><h3>${esc(c.title)}</h3><div class="metric small">${esc(c.value)}</div><div class="hint">${esc(c.hint)}</div></div>`)
       .join("")}</div>
@@ -282,7 +331,7 @@ async function renderPvz() {
       <div>${esc(note.text)}</div></div>`);
   const alert = notes.find((note) => note.payload && note.payload.kind === "long_storage" && note.payload.offer);
 
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="card">
       <div class="section-title">
         <h2>Кабинет ПВЗ</h2>
@@ -386,11 +435,10 @@ async function renderPvz() {
       price_rub: Number(form.get("price_rub")),
       pvz_id: pvz.id,
     };
-    const result = await guard(api("/items", { method: "POST", body: payload }), "Товар принят на хранение");
-    if (result) {
-      await loadCatalog();
-      render();
-    }
+    await withBusy(event.target, async () => {
+      const result = await guard(api("/items", { method: "POST", body: payload }), "Товар принят на хранение");
+      if (result) await refreshAfterAction();
+    });
   });
 
   $("#score-form").addEventListener("submit", async (event) => {
@@ -437,16 +485,17 @@ async function renderPvz() {
         toast("Нет партий для сверки", "error");
         return;
       }
-      try {
-        const data = await api(`/pvz/${pvz.id}/audit`, { method: "POST", body: { actual } });
-        state.audit = { pvzId: pvz.id, data };
-        await loadCatalog();
-        render();
-      } catch (error) {
-        state.audit = { pvzId: pvz.id, error: error.message };
-        const out = $("#audit-out");
-        if (out) out.innerHTML = auditResultHtml(state.audit);
-      }
+      await withBusy(event.target, async () => {
+        try {
+          const data = await api(`/pvz/${pvz.id}/audit`, { method: "POST", body: { actual } });
+          state.audit = { pvzId: pvz.id, data };
+          await refreshAfterAction();
+        } catch (error) {
+          state.audit = { pvzId: pvz.id, error: error.message };
+          const out = $("#audit-out");
+          if (out) out.innerHTML = auditResultHtml(state.audit);
+        }
+      });
     });
   }
 }
@@ -473,7 +522,7 @@ async function renderSeller() {
       <td class="num">${money(order.commission_rub)}</td>
       <td class="num">${money(order.net_rub)}</td>
     </tr>`);
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="card">
       <div class="section-title">
         <h2>Кабинет продавца</h2>
@@ -522,12 +571,13 @@ async function renderSeller() {
       to_pvz_id: Number(form.get("to_pvz_id")),
       accept_latency: form.get("accept_latency") === "on",
     };
-    const result = await guard(api("/orders", { method: "POST", body: payload }));
-    if (result) {
-      toast(`Заказ ${result.order.code}: ${result.order.route.kind}, ${money(result.order.route.total_cost_rub)}, ${dec(result.order.route.total_hours)} ч`, "ok");
-      await loadCatalog();
-      render();
-    }
+    await withBusy(event.target, async () => {
+      const result = await guard(api("/orders", { method: "POST", body: payload }));
+      if (result) {
+        toast(`Заказ ${result.order.code}: ${result.order.route.kind}, ${money(result.order.route.total_cost_rub)}, ${dec(result.order.route.total_hours)} ч`, "ok");
+        await refreshAfterAction();
+      }
+    });
   });
 }
 
@@ -565,7 +615,7 @@ async function renderOrders() {
     </div>`;
   }
 
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="card"><h2>Все заказы</h2>
       ${table(
         [{ title: "Заказ" }, { title: "Маршрут" }, { title: "Схема" }, { title: "Логистика", num: true },
@@ -580,8 +630,14 @@ async function renderRoutes() {
   const from = Number($("#from-select")?.value || state.pvzId || 1);
   const to = Number($("#to-select")?.value || 3);
   const accept = $("#accept-latency") ? $("#accept-latency").checked : true;
-  const comparison = await guard(api(`/routes/compare?from=${from}&to=${to}&accept_latency=${accept}`));
-  if (comparison) state.compare = comparison;
+  /* Одна и та же точка «откуда» и «куда» — сравнивать нечего: API вернёт пустой
+     маршрут, и в карточках появилось бы «mesh 0 ₽ 0 ч». Просим выбрать разные точки. */
+  const samePoints = from === to;
+  if (samePoints) state.compare = null;
+  else {
+    const comparison = await guard(api(`/routes/compare?from=${from}&to=${to}&accept_latency=${accept}`));
+    if (comparison) state.compare = comparison;
+  }
 
   const variant = (data, title) => `
     <div class="card"><h2>${title}</h2>
@@ -604,15 +660,17 @@ async function renderRoutes() {
     </tr>`);
 
   const cmp = state.compare;
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="card"><div class="section-title"><h2>Сравнение маршрутов</h2>
       <div class="inline">
-        <label>Откуда<select id="from-select">${pvzOptions(cmp ? cmp.from.id : 1)}</select></label>
-        <label>Куда<select id="to-select">${pvzOptions(cmp ? cmp.to.id : 3)}</select></label>
-        <label class="inline"><input type="checkbox" id="accept-latency" ${cmp && cmp.accept_latency ? "checked" : ""} style="width:auto" /> допустить рост срока</label>
+        <label>Откуда<select id="from-select">${pvzOptions(from)}</select></label>
+        <label>Куда<select id="to-select">${pvzOptions(to)}</select></label>
+        <label class="inline"><input type="checkbox" id="accept-latency" ${accept ? "checked" : ""} style="width:auto" /> допустить рост срока</label>
         <button class="btn" id="compare-btn">Рассчитать</button>
       </div></div>
-      ${cmp ? `<div class="hint"><strong>Выбрано: ${esc(cmp.chosen || "нет")}</strong> — ${esc(cmp.reason)}</div>` : ""}
+      ${samePoints
+        ? '<div class="hint bad">точки совпадают — выберите разные</div>'
+        : cmp ? `<div class="hint"><strong>Выбрано: ${esc(cmp.chosen || "нет")}</strong> — ${esc(cmp.reason)}</div>` : ""}
     </div>
     <div class="grid cols-2">
       ${cmp ? variant(cmp.mesh, "mesh · без хаба") : ""}
@@ -625,7 +683,7 @@ async function renderRoutes() {
 
   const recalc = () => {
     state.compare = null;
-    renderRoutes();
+    rerenderPage(renderRoutes);
   };
   $("#compare-btn").addEventListener("click", recalc);
   $("#from-select").addEventListener("change", recalc);
@@ -642,7 +700,7 @@ async function renderIncidents() {
       <td>${incident.resolved_route_id ? "маршрут #" + incident.resolved_route_id : "—"}</td>
       <td>${incident.status === "open" ? `<button class="btn small" data-action="reroute" data-id="${incident.id}">Перевыбрать маршрут</button>` : ""}</td>
     </tr>`);
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="card"><h2>Инциденты логистики</h2>
       ${table([{ title: "Инцидент" }, { title: "Причина" }, { title: "Заказ" }, { title: "Статус" }, { title: "Решение" }, { title: "" }], rows, "Инцидентов нет")}
       <div class="hint">Инцидент открывается при отключении сегмента, на котором стоит активный заказ. Если путь найден — заказ помечается «перемаршрутизирован», инцидент закрывается. Если пути нет — остаётся открытым до восстановления сегмента.</div>
@@ -659,7 +717,7 @@ async function renderClock() {
       <div>${esc(note.text)}</div>
       ${note.payload && note.payload.kind ? `<div class="muted small">тип: ${esc(note.payload.kind)}</div>` : ""}
     </div>`);
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="grid cols-2">
       <div class="card"><h2>Виртуальные часы</h2>
         <div class="metric">${dt(clock.virtual_now)}</div>
@@ -683,14 +741,15 @@ async function renderClock() {
     <div class="card"><h2>Лента уведомлений</h2>
       <div class="list">${noteRows.join("") || '<div class="empty">Уведомлений нет</div>'}</div>
     </div>`;
-  $("#advance-btn").addEventListener("click", async () => {
+  $("#advance-btn").addEventListener("click", async (event) => {
     const days = Number($("#days-input").value || 1);
-    const result = await guard(api(`/clock/advance?days=${days}`, { method: "POST" }));
-    if (result) {
-      toast(`Начислено за хранение: ${money(result.charged_total_rub)}, уведомлений: ${result.alerts}`, "ok");
-      await loadCatalog();
-      render();
-    }
+    await withBusy(event.currentTarget, async () => {
+      const result = await guard(api(`/clock/advance?days=${days}`, { method: "POST" }));
+      if (result) {
+        toast(`Начислено за хранение: ${money(result.charged_total_rub)}, уведомлений: ${result.alerts}`, "ok");
+        await refreshAfterAction();
+      }
+    });
   });
 }
 
@@ -717,7 +776,7 @@ async function renderBuyer() {
       <ul class="timeline">${timeline || "<li class=\"muted\">Событий пока нет</li>"}</ul>
     </div>`;
   }
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="card"><h2>Отслеживание заказа</h2>
       <div class="inline">
         <label style="min-width:260px">Код из ссылки покупателя<input id="track-code" placeholder="a1b2c3d4e5f6" value="${esc(state.buyerCode)}"></label>
@@ -753,10 +812,6 @@ function sliderMax(slider, value) {
   if (slider.unit === "%") return 100;
   const span = Math.max(value * 2, slider.step * 10);
   return Math.round(span / slider.step) * slider.step;
-}
-
-function factCell(text, ok) {
-  return `<td class="num ${ok ? "good" : "bad"}">${text}</td>`;
 }
 
 function greenZoneHtml(data) {
@@ -857,7 +912,7 @@ function pvzDayHtml(data) {
       <div class="bar ${ok ? "" : "warn"} mt"><span style="width:${Math.min(100, load)}%"></span></div>
       <div class="hint">Загрузка точки ${load}% от ${num(day.capacity_ops)} операций</div>
       <p class="mt">Точка выходит в ноль при <strong>${be.ops === null ? "нет данных" : num(be.ops)}</strong> операциях в день${share === null ? "" : ` — ${share}% мощности`}.</p>
-      <div class="hint">Порог хранения ${dec(data.storage_breakeven_days)} дн: дольше — продавец на заказе теряет.</div>
+      <div class="hint">${data.storage_breakeven_days === null ? "Порог хранения недостижим: при этих параметрах продавец не выходит в плюс." : `Порог хранения ${dec(data.storage_breakeven_days)} дн: дольше — продавец на заказе теряет.`}</div>
     </div>
     <div class="card"><h2>Очередь и границы модели</h2>
       <div class="list">
@@ -926,7 +981,6 @@ async function refreshEcon() {
 async function renderEconomics() {
   if (!state.econReady) {
     const base = await api("/economics/scenario");
-    state.econBase = base;
     state.econData = base;
     state.econ = {};
     ECON_SLIDERS.forEach((slider) => {
@@ -945,7 +999,7 @@ async function renderEconomics() {
              min="0" max="${max}" step="${slider.step}" value="${value}" />
     </div>`;
   }).join("");
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="card">
       <div class="section-title"><h2>Что если</h2><span id="econ-status" class="econ-status" role="status" aria-live="polite">—</span></div>
       <form id="econ-form" class="grid cols-2" onsubmit="return false">${rows}</form>
@@ -1444,7 +1498,7 @@ function renderDemo() {
       (line) => `<tr><td>${esc(step.title)}</td><td><span class="badge ${result.status === "pass" ? "badge-good" : "badge-bad"}">${result.status === "pass" ? "PASS" : "FAIL"}</span></td><td>${esc(line)}</td></tr>`
     );
   });
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="card">
       <div class="section-title">
         <h2>Демо-кокпит: 5 обязательных + 2 расширенных сценария на живом API</h2>
@@ -1469,7 +1523,7 @@ async function runDemoStep(id) {
   if (state.demo.running) return;
   if (!DEMO_RUNNERS[id]) return;
   state.demo.running = id;
-  renderDemo();
+  rerenderPage(renderDemo);
   try {
     const result = await DEMO_RUNNERS[id]();
     state.demo.steps[id] = { ...result, at: new Date() };
@@ -1492,7 +1546,7 @@ async function runDemoStep(id) {
 async function runAllDemo() {
   if (state.demo.running) return;
   state.demo.running = "all";
-  renderDemo();
+  rerenderPage(renderDemo);
   try {
     const prep = await demoCleanup();
     if (prep.length) state.demo.prep = prep;
@@ -1543,8 +1597,65 @@ const pages = {
   demo: { title: "Демо-кокпит", subtitle: "5 обязательных + 2 расширенных сценария на живом API: PASS/FAIL и лог различий", render: async () => renderDemo() },
 };
 
+/* ---------- поколение рендера ---------- */
+/* Навигация и действия могут запустить render() несколько раз подряд, а внутри
+   страниц есть await (запросы к API). Медленный ответ прошлой страницы не должен
+   перерисовать текущую — поэтому у каждого рендера свой номер поколения. */
+let renderSeq = 0;
+let pageSeq = 0;
+
+/* Контейнер страницы для записи. Устаревшее поколение не пишет в документ:
+   прерываем его исключением, чтобы оно не навесило обработчики на чужую страницу. */
+function pageBox() {
+  if (pageSeq !== renderSeq) {
+    const error = new Error("устаревший рендер");
+    error.stale = true;
+    throw error;
+  }
+  return $("#page");
+}
+
+/* Перерисовка текущей страницы из её же обработчиков (кнопка «Рассчитать», шаги демо).
+   Если пользователь успел уйти на другую страницу, прерывание рендера — норма, не ошибка. */
+function rerenderPage(fn) {
+  try {
+    const result = fn();
+    if (result && typeof result.catch === "function") {
+      result.catch((error) => {
+        if (!error || !error.stale) setTimeout(() => { throw error; });
+      });
+    }
+  } catch (error) {
+    if (!error || !error.stale) throw error;
+  }
+}
+
+/* Поколение рендера: навигация и действия запускают render() конкурентно,
+   и медленный ответ прошлой страницы не должен затирать текущую. */
 async function render() {
+  const my = ++renderSeq;
   const page = pages[state.page];
+  const container = $("#page");
+  /* Ошибка поиска покупателя живёт только на странице «Покупатель». */
+  if (state.page !== "buyer") state.buyerError = null;
+  container.classList.add("is-loading");
+  try {
+    await loadCatalog();
+    if (my !== renderSeq) return;
+    /* Разрешаем запись в #page именно этому поколению. */
+    pageSeq = my;
+    await page.render();
+    if (my !== renderSeq) return;
+  } catch (error) {
+    /* Устаревший рендер прервался сам — это не ошибка страницы. */
+    if (my !== renderSeq || error.stale) return;
+    /* Пишем напрямую в контейнер: поколение актуально, а pageBox() мог не успеть
+       разрешить запись (сбой случился на loadCatalog). */
+    container.innerHTML = `<div class="card"><h2>Ошибка</h2><p>${esc(error.message)}</p><p class="muted small">Проверьте, что API запущен и доступен по /api/v1.</p></div>`;
+  } finally {
+    if (my === renderSeq) container.classList.remove("is-loading");
+  }
+  if (my !== renderSeq) return;
   $("#page-title").textContent = page.title;
   $("#page-subtitle").textContent = page.subtitle;
   document.querySelectorAll(".nav-item").forEach((button) => {
@@ -1553,16 +1664,13 @@ async function render() {
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   });
-  const container = $("#page");
-  container.classList.add("is-loading");
-  try {
-    await loadCatalog();
-    await page.render();
-  } catch (error) {
-    container.innerHTML = `<div class="card"><h2>Ошибка</h2><p>${esc(error.message)}</p><p class="muted small">Проверьте, что API запущен и доступен по /api/v1.</p></div>`;
-  } finally {
-    container.classList.remove("is-loading");
-  }
+}
+
+/* После смены страницы уводим фокус на заголовок: иначе он остаётся на пункте
+   меню, и скринридер не объявляет новый экран. */
+function focusPageTitle() {
+  const title = $("#page-title");
+  if (title) title.focus({ preventScroll: false });
 }
 
 document.addEventListener("click", async (event) => {
@@ -1570,7 +1678,12 @@ document.addEventListener("click", async (event) => {
   if (nav) {
     state.page = nav.dataset.page;
     state.ledgerOrderId = null;
-    render();
+    /* Ошибка поиска покупателя не должна переезжать на другие страницы. */
+    state.buyerError = null;
+    /* Ждём отрисовку: заголовок должен уже содержать новый текст, когда на него
+       переедет фокус, иначе скринридер объявит старый. */
+    await render();
+    focusPageTitle();
     return;
   }
   const demoStep = event.target.closest("[data-demo-step]");
@@ -1584,83 +1697,91 @@ document.addEventListener("click", async (event) => {
   }
   if (event.target.closest("[data-demo-reset]")) {
     state.demo = { steps: {}, ctx: {}, running: null, goods: null, prep: [] };
-    renderDemo();
+    rerenderPage(renderDemo);
     return;
   }
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const id = Number(button.dataset.id);
   const action = button.dataset.action;
-  let result = null;
-  if (action === "assemble") result = await guard(api(`/orders/${id}/assemble`, { method: "POST" }), "Заказ собран");
-  if (action === "transit") result = await guard(api(`/orders/${id}/transit`, { method: "POST" }), "Заказ в пути");
-  if (action === "issue") result = await guard(api(`/orders/${id}/issue`, { method: "POST" }), "Заказ выдан, начисления сформированы");
-  if (action === "return") result = await guard(api(`/orders/${id}/return`, { method: "POST" }), "Возврат оформлен");
-  if (action === "cancel") result = await guard(api(`/orders/${id}/cancel`, { method: "POST" }), "Заказ отменён");
-  if (action === "track-link") {
-    const url = `${location.origin}/?track=${button.dataset.token}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast("Ссылка покупателю скопирована", "ok");
-    } catch {
-      toast(url, "ok");
+  /* Действия над заказами и узлами шлют POST: пока запрос в полёте, кнопка выключена,
+     второй клик не создаёт дубль. */
+  await withBusy(button, async () => {
+    let result = null;
+    if (action === "assemble") result = await guard(api(`/orders/${id}/assemble`, { method: "POST" }), "Заказ собран");
+    if (action === "transit") result = await guard(api(`/orders/${id}/transit`, { method: "POST" }), "Заказ в пути");
+    if (action === "issue") result = await guard(api(`/orders/${id}/issue`, { method: "POST" }), "Заказ выдан, начисления сформированы");
+    if (action === "return") result = await guard(api(`/orders/${id}/return`, { method: "POST" }), "Возврат оформлен");
+    if (action === "cancel") result = await guard(api(`/orders/${id}/cancel`, { method: "POST" }), "Заказ отменён");
+    if (action === "track-link") {
+      const url = `${location.origin}/?track=${button.dataset.token}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast("Ссылка покупателю скопирована", "ok");
+      } catch {
+        toast(url, "ok");
+      }
+      return;
     }
-    return;
-  }
-  if (action === "track") {
-    state.buyerCode = ($("#track-code")?.value || "").trim().toLowerCase();
-    state.buyerData = null;
-    state.buyerError = null;
-    try {
-      state.buyerData = await api(`/track/${encodeURIComponent(state.buyerCode)}`);
-    } catch (error) {
-      state.buyerError = error.message;
+    if (action === "track") {
+      const code = ($("#track-code")?.value || "").trim().toLowerCase();
+      state.buyerCode = code;
+      state.buyerData = null;
+      state.buyerError = null;
+      /* Пустой код не отправляем в API — сразу подсказываем, что ввести. */
+      if (!code) {
+        toast("введите код заказа", "error");
+        render();
+        return;
+      }
+      try {
+        state.buyerData = await api(`/track/${encodeURIComponent(code)}`);
+      } catch (error) {
+        state.buyerError = trackErrorMessage(error.message);
+      }
+      render();
+      return;
     }
-    render();
-    return;
-  }
-  if (action === "ledger") {
-    state.ledgerOrderId = state.ledgerOrderId === id ? null : id;
-    render();
-    return;
-  }
-  if (action === "close-ledger") {
-    state.ledgerOrderId = null;
-    render();
-    return;
-  }
-  if (action === "disable-edge") {
-    result = await guard(api(`/edges/${id}/disable`, { method: "POST" }));
-    if (result) {
-      const incidents = result.incidents || [];
-      toast(incidents.length
-        ? `Сегмент отключён. Инцидентов: ${incidents.length}, статус: ${incidents[0].incident.status}`
-        : "Сегмент отключён. Активных заказов на нём нет.", incidents.length ? "ok" : "");
+    if (action === "ledger") {
+      state.ledgerOrderId = state.ledgerOrderId === id ? null : id;
+      render();
+      return;
     }
-  }
-  if (action === "enable-edge") result = await guard(api(`/edges/${id}/enable`, { method: "POST" }), "Сегмент включён");
-  if (action === "node-down") {
-    if (!confirm("Вывести ПВЗ из строя? Свободные остатки переедут к соседям (стоимость перемещения — параметр модели), заказы будут переадресованы.")) return;
-    result = await guard(api(`/pvz/${id}/disable`, { method: "POST" }));
-    if (result) {
-      const moved = (result.evacuated || []).length;
-      const reassigned = (result.orders || []).length;
-      const left = (result.unresolved || []).length;
-      toast(`ПВЗ ${result.pvz.code} выведен из строя: перемещено партий ${moved}, обработано заказов ${reassigned}, не решено ${left}, затраты ${money(result.relocation_total_rub)}.`, left ? "" : "ok");
+    if (action === "close-ledger") {
+      state.ledgerOrderId = null;
+      render();
+      return;
     }
-  }
-  if (action === "node-up") result = await guard(api(`/pvz/${id}/enable`, { method: "POST" }), "ПВЗ вернулся в строй");
-  if (action === "reroute") result = await guard(api(`/incidents/${id}/reroute`, { method: "POST", body: { accept_latency: true } }), "Маршрут перевыбран");
-  if (action === "relocate") {
-    const target = prompt("Введите ID ПВЗ для перемещения остатка (см. список точек):", String(points().find((row) => row.id !== state.pvzId)?.id || 2));
-    if (!target) return;
-    result = await guard(api(`/items/${id}/relocate`, { method: "POST", body: { to_pvz_id: Number(target) } }));
-    if (result) toast(`Остаток перемещён: ${result.relocation.cells} яч.`, "ok");
-  }
-  if (result) {
-    await loadCatalog();
-    render();
-  }
+    if (action === "disable-edge") {
+      result = await guard(api(`/edges/${id}/disable`, { method: "POST" }));
+      if (result) {
+        const incidents = result.incidents || [];
+        toast(incidents.length
+          ? `Сегмент отключён. Инцидентов: ${incidents.length}, статус: ${incidents[0].incident.status}`
+          : "Сегмент отключён. Активных заказов на нём нет.", incidents.length ? "ok" : "");
+      }
+    }
+    if (action === "enable-edge") result = await guard(api(`/edges/${id}/enable`, { method: "POST" }), "Сегмент включён");
+    if (action === "node-down") {
+      if (!confirm("Вывести ПВЗ из строя? Свободные остатки переедут к соседям (стоимость перемещения — параметр модели), заказы будут переадресованы.")) return;
+      result = await guard(api(`/pvz/${id}/disable`, { method: "POST" }));
+      if (result) {
+        const moved = (result.evacuated || []).length;
+        const reassigned = (result.orders || []).length;
+        const left = (result.unresolved || []).length;
+        toast(`ПВЗ ${result.pvz.code} выведен из строя: перемещено партий ${moved}, обработано заказов ${reassigned}, не решено ${left}, затраты ${money(result.relocation_total_rub)}.`, left ? "" : "ok");
+      }
+    }
+    if (action === "node-up") result = await guard(api(`/pvz/${id}/enable`, { method: "POST" }), "ПВЗ вернулся в строй");
+    if (action === "reroute") result = await guard(api(`/incidents/${id}/reroute`, { method: "POST", body: { accept_latency: true } }), "Маршрут перевыбран");
+    if (action === "relocate") {
+      const target = prompt("Введите ID ПВЗ для перемещения остатка (см. список точек):", String(points().find((row) => row.id !== state.pvzId)?.id || 2));
+      if (!target) return;
+      result = await guard(api(`/items/${id}/relocate`, { method: "POST", body: { to_pvz_id: Number(target) } }));
+      if (result) toast(`Остаток перемещён: ${result.relocation.cells} яч.`, "ok");
+    }
+    if (result) await refreshAfterAction();
+  });
 });
 
 $("#refresh").addEventListener("click", render);
@@ -1680,7 +1801,7 @@ if (deepLink) {
   state.buyerCode = deepLink.trim().toLowerCase();
   api(`/track/${encodeURIComponent(state.buyerCode)}`)
     .then((data) => { state.buyerData = data; })
-    .catch((error) => { state.buyerError = error.message; })
+    .catch((error) => { state.buyerError = trackErrorMessage(error.message); })
     .finally(render);
 }
 render();
