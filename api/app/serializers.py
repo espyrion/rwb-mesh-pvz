@@ -88,7 +88,9 @@ def route_dict(route: Route | None) -> dict | None:
     }
 
 
-def order_dict(session: Session, order: Order) -> dict:
+def order_dict(session: Session, order: Order, include_token: bool = True) -> dict:
+    """Карточка заказа. include_token=False скрывает public_token: анонимный список
+    заказов не должен выдавать ссылки трекинга (иначе защита перебором обнуляется)."""
     item = session.get(Item, order.item_id)
     src = session.get(Pvz, order.from_pvz)
     dst = session.get(Pvz, order.to_pvz)
@@ -115,7 +117,7 @@ def order_dict(session: Session, order: Order) -> dict:
         "buyer_total_rub": order.buyer_total_rub,
         "seller_net_rub": order.seller_net_rub,
         "return_route_id": order.return_route_id,
-        "public_token": order.public_token,
+        "public_token": order.public_token if include_token else None,
     }
 
 

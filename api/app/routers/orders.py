@@ -4,7 +4,7 @@ from __future__ import annotations
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
@@ -13,11 +13,17 @@ from ..paging import page
 from ..responses import OrderOut
 from ..clock import now
 from ..config import p
+from ..auth import role_of
 from ..db import begin_immediate, get_db
 from ..models import Item, ORDER_TRANSITIONS, Order, Pvz, Route
 from ..notify import notify
 from ..schemas import OrderCreate
 from ..serializers import order_dict, route_dict
+
+def _keyed(request: Request) -> bool:
+    """Запрос с валидным API-ключом (GET открыт всем, поэтому роль в state не выставляется)."""
+    return role_of(request.headers.get("X-API-Key") or request.query_params.get("api_key")) is not None
+
 
 router = APIRouter(tags=["orders"])
 
@@ -55,6 +61,10 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
     if not dst.is_active:
         raise HTTPException(409, f"ПВЗ {dst.code} недоступен")
     src = db.get(Pvz, item.stored_pvz_id)
+    if src is None:
+        raise HTTPException(409, "товар не размещён ни на одном ПВЗ")
+    if not src.is_active:
+        raise HTTPException(409, f"ПВЗ {src.code}, где лежит товар, выведен из строя — оформите переадресацию")
     if src.id == dst.id:
         raise HTTPException(422, "точка выдачи совпадает с местом хранения")
 
@@ -68,7 +78,11 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
     except storage.CapacityError as exc:
         raise HTTPException(409, str(exc)) from exc
 
-    comparison = routing.compare(db, src.id, dst.id, payload.accept_latency)
+    try:
+        comparison = routing.compare(db, src.id, dst.id, payload.accept_latency)
+    except ValueError as exc:
+        # Неактивный или несвязанный узел: 409 с текстом, а не 500 с traceback.
+        raise HTTPException(409, str(exc)) from exc
     if not comparison["chosen"]:
         raise HTTPException(409, comparison["reason"])
 
@@ -115,6 +129,7 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
 @router.get("/orders", response_model=list[OrderOut])
 def list_orders(
     response: Response,
+    request: Request,
     status: str | None = None,
     pvz_id: int | None = Query(default=None, description="Заказы, где ПВЗ — источник или получатель"),
     code: str | None = Query(default=None, description="Поиск по коду (без учёта регистра)"),
@@ -129,15 +144,16 @@ def list_orders(
         q = q.filter((Order.from_pvz == pvz_id) | (Order.to_pvz == pvz_id))
     if code:
         q = q.filter(Order.code.ilike(f"%{code.strip()}%"))
-    return [order_dict(db, row) for row in page(q, response, limit, offset)]
+    token_ok = _keyed(request)
+    return [order_dict(db, row, include_token=token_ok) for row in page(q, response, limit, offset)]
 
 
 @router.get("/orders/{order_id}", response_model=OrderOut)
-def get_order(order_id: int, db: Session = Depends(get_db)):
+def get_order(order_id: int, request: Request, db: Session = Depends(get_db)):
     row = db.get(Order, order_id)
     if row is None:
         raise HTTPException(404, "order not found")
-    return order_dict(db, row)
+    return order_dict(db, row, include_token=_keyed(request))
 
 
 @router.post("/orders/{order_id}/assemble")

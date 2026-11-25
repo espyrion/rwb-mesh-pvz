@@ -21,6 +21,15 @@ class OrderCreate(BaseModel):
     accept_latency: bool = True
     idempotency_key: str | None = Field(default=None, max_length=64)
 
+    @field_validator("idempotency_key")
+    @classmethod
+    def _blank_to_none(cls, value):
+        """Пустая строка — это «ключа нет»: иначе второй заказ ломает UNIQUE-индекс."""
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
 
 class RelocateRequest(BaseModel):
     to_pvz_id: int

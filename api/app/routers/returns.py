@@ -33,7 +33,10 @@ def return_order(order_id: int, db: Session = Depends(get_db)):
     if item is None:
         raise HTTPException(409, "товар заказа не найден")
 
-    comparison = routing.compare(db, order.to_pvz, order.from_pvz, accept_latency=True)
+    try:
+        comparison = routing.compare(db, order.to_pvz, order.from_pvz, accept_latency=True)
+    except ValueError as exc:
+        raise HTTPException(409, f"обратный маршрут недоступен: {exc}") from exc
     if not comparison["chosen"]:
         raise HTTPException(409, f"обратный маршрут недоступен: {comparison['reason']}")
     reverse_route = routing.make_route(
@@ -50,8 +53,10 @@ def return_order(order_id: int, db: Session = Depends(get_db)):
     money.post_return(db, order, item, reverse_route)
     storage.occupy(dst, cells)
     item.stored_pvz_id = dst.id
-    # Партия могла быть разделена при сборке: возвращается ровно количество заказа.
-    item.qty = order.qty
+    # Партия могла быть разделена при сборке: возвращаем ровно количество заказа.
+    # Не перезаписываем qty: инвентаризация могла оприходовать излишек, и присваивание
+    # стёрло бы учтённые единицы (аудит 2026-11-25).
+    item.qty += order.qty
     item.status = "returned"
     item.last_accrued_at = ts
     item.relocate_alert_sent = False
