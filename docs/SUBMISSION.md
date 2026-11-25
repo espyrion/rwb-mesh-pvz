@@ -138,8 +138,8 @@ curl http://localhost:8000/api/v1/health/deep
 
 | Job | Проверка |
 |---|---|
-| `api` (py3.11, 3.12) | `cd api && python -m pytest tests -q --tb=short`, 135 тестов |
-| `economics` | `python -m pytest economics/tests -q --tb=short`, 14 тестов |
+| `api` (py3.11, 3.12) | `cd api && python -m pytest tests -q --tb=short`, 143 теста |
+| `economics` | `python -m pytest economics/tests -q --tb=short`, 28 тестов |
 | `web-lint` | `node --check web/src/*.js` |
 | `contract` | перегенерация OpenAPI в `/tmp` и сравнение распарсенного JSON с `docs/openapi.json` |
 | `simulation-smoke` | `simulate.py --orders 100 --seed 42` + перегенерация `SCALE.md` и diff |
