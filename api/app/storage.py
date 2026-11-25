@@ -196,6 +196,8 @@ def relocate(session: Session, item: Item, to_pvz_id: int) -> dict:
         raise LookupError("pvz not found")
     if dst.is_hub:
         raise ValueError("нельзя переместить остаток на хаб")
+    if not dst.is_active:
+        raise ValueError(f"ПВЗ {dst.code} выведен из строя: перемещение запрещено")
     if dst.id == src.id:
         raise ValueError("остаток уже на этом ПВЗ")
     if dst.city != src.city:

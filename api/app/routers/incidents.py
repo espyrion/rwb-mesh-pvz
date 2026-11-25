@@ -132,19 +132,6 @@ def incidents_for_edge(session: Session, edge_id: int, reason: str) -> list[dict
     return result
 
 
-def incidents_for_node(session: Session, pvz_id: int, reason: str) -> list[dict]:
-    result = []
-    orders = session.query(Order).filter(Order.status.in_(ACTIVE)).order_by(Order.id).all()
-    for order in orders:
-        if not _touch_pvz(session, order, pvz_id):
-            continue
-        inc = _open_incident(session, order, "node_down", f"Узел {pvz_id} недоступен. {reason}")
-        new_route = reroute_order(session, order, inc)
-        result.append({"incident": incident_dict(inc), "order": order_dict(session, order), "new_route": route_dict(new_route)})
-    session.flush()
-    return result
-
-
 @router.get("/incidents", response_model=list[IncidentOut])
 def list_incidents(status: str | None = None, db: Session = Depends(get_db)):
     q = db.query(Incident).order_by(Incident.id.desc())
