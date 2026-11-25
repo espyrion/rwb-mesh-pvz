@@ -16,6 +16,11 @@
 | 8. Презентация и речь | `docs/pitch/slides.html` (исходник) → `docs/pitch/RWB-Mesh-PVZ-pitch.pdf`, `docs/pitch/SPEECH.md` |
 | 9. Происхождение данных, backup-видео | `docs/PROVENANCE.md`, `docs/demo-backup.mp4` |
 
+Репозиторий и конкурсная версия — https://github.com/espyrion/rwb-mesh-pvz, итоговый коммит
+помечен тегом `submission-2026-11-25` (хеш: `git rev-parse submission-2026-11-25`).
+
+Тиражирование и архитектура — `docs/REPLICATION.md`, `docs/PILOT.md`, `docs/SCALE.md`.
+
 ## 1. Репозиторий и структура
 
 ```
@@ -30,7 +35,13 @@ mesh-pvz/
 ```
 
 Актуальная ветка — `master`: все рабочие ветки влиты, последний merge — из
-`fix/final-review-and-ui-polish` (хеш — `git log -1 master`).
+`fix/final-review-and-ui-polish`. Конкурсная версия зафиксирована тегом `submission-2026-11-25` в
+репозитории https://github.com/espyrion/rwb-mesh-pvz (хеш тега — `git rev-parse submission-2026-11-25`).
+
+Поставка — архив тега либо сборка из чистого клона: `git archive --format=tar.gz -o mesh-pvz.tar.gz
+submission-2026-11-25` (дальше распаковать и, при желании, `docker compose build`), либо
+`git clone https://github.com/espyrion/rwb-mesh-pvz && cd rwb-mesh-pvz && git checkout submission-2026-11-25
+&& docker compose build`. В архиве только исходники: база, тома и образы в поставку не входят.
 
 ## 2. Как поднять с нуля
 
@@ -109,7 +120,7 @@ curl http://localhost:8000/api/v1/health/deep
 | `docs/API.md` | эндпоинты, модели, ошибки, идемпотентность |
 | `docs/openapi.json` | машинный контракт, 40 путей |
 | `docs/SCENARIOS_REPORT.md` | фактический прогон `scripts/demo.py` 7/7: ID, статусы, остатки, маршруты, ledger |
-| `docs/SCENARIOS.md` | 6 демо-кейсов (5 автотестов + отмена/трекинг), что проверяет каждый |
+| `docs/SCENARIOS.md` | 7 сценариев (5 обязательных ТЗ + 2 расширенных), что проверяет каждый |
 | `docs/REDTEAM.md` | 10 вопросов жюри с ответами и числами |
 | `docs/PILOT.md` | пилот 30 дней: гипотезы, метрики, stop-критерии |
 | `docs/REPLICATION.md` | тиражирование, метрики, риски, техплан |
@@ -120,15 +131,23 @@ curl http://localhost:8000/api/v1/health/deep
 
 ## 6. Что проверяет CI
 
-`.github/workflows/ci.yml`, все джобы на SQLite в `/tmp`, без Docker и внешних API:
+`.github/workflows/ci.yml`, все джобы на SQLite, без Docker и внешних API. Тесты всегда работают на
+своей временной базе: `api/tests/conftest.py` сам выставляет `DATABASE_URL` на свежий каталог в
+`tempfile.mkdtemp()` и создаёт его при импорте, поэтому отдельная база в CI не задаётся и боевой том
+не затрагивается ни в CI, ни локально:
 
 | Job | Проверка |
 |---|---|
-| `api` (py3.11, 3.12) | `pytest api/tests -q --tb=short`, 135 тестов |
-| `economics` | `pytest economics/tests -q --tb=short`, 14 тестов |
+| `api` (py3.11, 3.12) | `cd api && python -m pytest tests -q --tb=short`, 135 тестов |
+| `economics` | `python -m pytest economics/tests -q --tb=short`, 14 тестов |
 | `web-lint` | `node --check web/src/*.js` |
 | `contract` | перегенерация OpenAPI в `/tmp` и сравнение распарсенного JSON с `docs/openapi.json` |
 | `simulation-smoke` | `simulate.py --orders 100 --seed 42` + перегенерация `SCALE.md` и diff |
+
+Локально те же команды: `cd api && ../.venv/bin/python -m pytest tests -q` (из корня `pytest api/tests`
+падает: `api/pytest.ini` задаёт `pythonpath = ..`, а тесты ждут рабочего каталога `api/`) и
+`.venv/bin/python -m pytest economics/tests -q`. Всё сразу — `bash scripts/run_tests.sh`: он же проверяет,
+что `docs/ECON_REPORT.md` и `docs/openapi.json` не устарели (артефакты не перезаписывает).
 
 ## 7. Известные ограничения и риски
 

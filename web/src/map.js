@@ -86,7 +86,11 @@ function mapEdgeSvg(pair) {
   const stroke = alive ? (trunk ? "#4f659e" : "#42537a") : "#7e3437";
   const dash = trunk ? ' stroke-dasharray="9 7"' : "";
   MAP_TIPS[pair.key] = mapTipHtml(pair);
-  return `<g class="${cls}" data-tipkey="${pair.key}">
+  /* Сегмент доступен с клавиатуры: имя и стоимость читает скринридер, фокус показывает подсказку. */
+  const first = pair.rows[0];
+  const label = `${first.from_code} — ${first.to_code}, ${trunk ? "магистраль через хаб" : "локальный сегмент"}` +
+    `, ${money(first.cost_rub)}, ${dec(first.hours)} ч${alive ? "" : ", отключён"}`;
+  return `<g class="${cls}" data-tipkey="${pair.key}" tabindex="0" role="button" aria-label="${esc(label)}">
     <path class="edge-hit" d="${path.d}" fill="none" stroke="transparent" stroke-width="18"/>
     <path class="edge-line" d="${path.d}" fill="none" stroke="${stroke}" stroke-width="${trunk ? 2.4 : 1.6}" stroke-linecap="round" stroke-opacity="${trunk ? 0.95 : 0.8}"${dash}/>
   </g>`;
@@ -112,6 +116,10 @@ function mapNodeSvg(row) {
   const tone = !row.is_active ? "down" : util >= 85 ? "bad" : util >= 70 ? "warn" : "good";
   const color = { good: "#34c38f", warn: "#f0b429", bad: "#ef6461", down: "#93a0b8" }[tone];
   const selected = state.mapNode === row.id;
+  /* Текст для скринридера: узел на схеме — тоже кнопка, у него должно быть имя. */
+  const label = hub
+    ? `Хаб ${row.code}, ${row.city}${row.is_active ? "" : ", выведен из строя"}: открыть карточку узла`
+    : `ПВЗ ${row.code}, ${row.name}, загрузка ${Math.round(util)}%, ${row.is_active ? "в строю" : "выведена из строя"}: открыть карточку`;
   const body = hub
     ? `<path d="M 0 ${-r} L ${r} 0 L 0 ${r} L ${-r} 0 Z" fill="#1b2740" stroke="${color}" stroke-width="2"/>
        <text class="node-hub" x="0" y="3.4" text-anchor="middle">HUB</text>
@@ -127,7 +135,8 @@ function mapNodeSvg(row) {
        <text class="node-down-tag" x="0" y="${r + 31}" text-anchor="middle">выведена</text>`;
   const halo = selected ? `<circle class="halo" r="${r + 12}" fill="none" stroke="#4f8cff" stroke-width="1.6"/>` : "";
   return `<g class="node ${row.is_active ? "" : "is-down"} ${selected ? "is-selected" : ""}"
-      transform="translate(${pos.x}, ${pos.y})" data-map-action="node" data-id="${row.id}">
+      transform="translate(${pos.x}, ${pos.y})" data-map-action="node" data-id="${row.id}"
+      tabindex="0" role="button" aria-label="${esc(label)}" aria-pressed="${selected ? "true" : "false"}">
     ${halo}
     ${body}
     ${dead}
@@ -274,9 +283,11 @@ function mapPanelHtml() {
               <div class="list-item small">Свободно <strong>${node.free_cells}</strong> яч. · хранение ${money(node.storage_rate_day)}/яч./день · выдача ${money(node.op_fee)}</div>`}
        </div>
        <div class="inline" style="margin-top:12px">
-         ${node.is_active
-           ? `<button class="btn danger small" data-map-action="down" data-id="${node.id}">Вывести из строя</button>`
-           : `<button class="btn good small" data-map-action="up" data-id="${node.id}">Вернуть в строй</button>`}
+         ${node.is_hub
+           ? ""
+           : node.is_active
+             ? `<button class="btn danger small" data-map-action="down" data-id="${node.id}">Вывести из строя</button>`
+             : `<button class="btn good small" data-map-action="up" data-id="${node.id}">Вернуть в строй</button>`}
          ${node.is_hub ? "" : `<button class="btn ghost small" data-map-action="open-pvz" data-id="${node.id}">Кабинет ПВЗ</button>`}
        </div>`
     : `<div class="section-title"><h2>Сводка сети</h2></div>
@@ -329,7 +340,7 @@ async function renderMap() {
   if (state.mapNode && !state.pvz.some((row) => row.id === state.mapNode)) state.mapNode = null;
   const orderCount = state.orders.filter((row) => row.route).length;
   const pairCount = new Set(state.edges.map((row) => mapPairKey(row.from_pvz, row.to_pvz))).size;
-  $("#page").innerHTML = `
+  pageBox().innerHTML = `
     <div class="map-grid">
       <div class="card">
         <div class="section-title">
@@ -373,14 +384,13 @@ async function mapAction(action, id) {
     if (!result) return;
     state.mapNode = id;
     state.mapFailure = result;
-    await loadCatalog();
+    await refreshAfterAction();
     const left = (result.unresolved || []).length;
     toast(
       `ПВЗ ${result.pvz.code} выведен из строя: перемещено партий ${(result.evacuated || []).length}, ` +
         `обработано заказов ${(result.orders || []).length}, не решено ${left}, затраты ${money(result.relocation_total_rub)}.`,
       left ? "" : "ok"
     );
-    render();
     return;
   }
   if (action === "up") {
@@ -388,8 +398,7 @@ async function mapAction(action, id) {
     if (!result) return;
     state.mapNode = id;
     state.mapFailure = null;
-    await loadCatalog();
-    render();
+    await refreshAfterAction();
   }
 }
 
@@ -426,5 +435,65 @@ document.addEventListener("mousemove", (event) => {
 document.addEventListener("click", (event) => {
   const el = event.target.closest("[data-map-action]");
   if (!el) return;
-  mapAction(el.dataset.mapAction, el.dataset.id ? Number(el.dataset.id) : null);
+  /* Кнопки панели шлют POST: повторный клик во время запроса игнорируем. */
+  const run = () => mapAction(el.dataset.mapAction, el.dataset.id ? Number(el.dataset.id) : null);
+  if (el.tagName === "BUTTON") withBusy(el, run);
+  else run();
+});
+
+/* Подсказка сегмента по фокусу с клавиатуры: мышью её показывает mousemove,
+   а клавиатурному пользователю нужно то же самое. */
+function mapTipAt(el) {
+  const tip = $("#map-tip");
+  const netmap = $("#netmap");
+  if (!tip || !netmap) return;
+  const key = el.dataset.tipkey;
+  tip.innerHTML = MAP_TIPS[key] || "";
+  tip.hidden = false;
+  const box = netmap.getBoundingClientRect();
+  const target = el.getBoundingClientRect();
+  const left = Math.min(target.left - box.left + target.width / 2 + 12, box.width - tip.offsetWidth - 8);
+  const top = Math.max(4, Math.min(target.top - box.top + target.height + 8, box.height - tip.offsetHeight - 8));
+  tip.style.left = `${Math.max(4, left)}px`;
+  tip.style.top = `${top}px`;
+  mapTipKey = key;
+}
+
+/* Клавиатура: Enter/Space на узле открывают карточку, на сегменте — показывают подсказку.
+   Escape закрывает подсказку: не все среды присылают focusout для SVG-групп. */
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    const tip = $("#map-tip");
+    if (tip && !tip.hidden) {
+      tip.hidden = true;
+      mapTipKey = null;
+    }
+    return;
+  }
+  if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
+  const target = event.target;
+  if (!target || !target.closest) return;
+  const el = target.closest("[data-map-action]");
+  if (el) {
+    event.preventDefault();
+    mapAction(el.dataset.mapAction, el.dataset.id ? Number(el.dataset.id) : null);
+    return;
+  }
+  const segment = target.closest("[data-tipkey]");
+  if (segment) {
+    event.preventDefault();
+    mapTipAt(segment);
+  }
+});
+
+/* Ушли фокусом с сегмента — прячем подсказку, чтобы она не висела. */
+document.addEventListener("focusin", (event) => {
+  const el = event.target.closest && event.target.closest("[data-tipkey]");
+  if (el) mapTipAt(el);
+});
+document.addEventListener("focusout", (event) => {
+  if (!event.target.closest || !event.target.closest("[data-tipkey]")) return;
+  const tip = $("#map-tip");
+  if (tip) tip.hidden = true;
+  mapTipKey = null;
 });

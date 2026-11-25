@@ -6,6 +6,10 @@
 # uvicorn работает с --reload, web отдаёт файлы из ./web/src напрямую и не
 # кэширует их в браузере (web/nginx.dev.conf). Правки JS/CSS/Python видны без
 # пересборки образов. Требует пересборки образов: docker compose ... up -d --build
+#
+# restart: unless-stopped из production здесь намеренно не включается: в dev
+# ошибка в коде должна останавливать контейнер с видимым логом, а не крутиться
+# в цикле перезапусков.
 services:
   api:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

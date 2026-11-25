@@ -11,7 +11,7 @@ class ItemCreate(BaseModel):
     qty: int = Field(ge=1, le=1000)
     cell_size: int = Field(ge=1, le=10)
     pvz_id: int
-    price_rub: float = Field(default=2500.0, ge=0)
+    price_rub: float = Field(default=2500.0, ge=0, allow_inf_nan=False, le=10_000_000)
 
 
 class OrderCreate(BaseModel):

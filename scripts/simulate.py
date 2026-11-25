@@ -238,9 +238,50 @@ def build_markdown(params: dict, runs: list[dict], seed: int) -> str:
     return "\n".join(lines)
 
 
+def positive_orders(value: str) -> list[int]:
+    """argparse-тип для --orders: целые >0 через запятую, с понятной ошибкой."""
+    parts = [part.strip() for part in value.split(",")]
+    if not parts or any(not part for part in parts):
+        raise argparse.ArgumentTypeError(
+            f"«{value}» — ожидается список целых чисел >0 через запятую, например 100,500,2000"
+        )
+    volumes: list[int] = []
+    for part in parts:
+        try:
+            number = int(part)
+        except ValueError:
+            raise argparse.ArgumentTypeError(
+                f"«{part}» не целое число; --orders принимает целые >0 через запятую (100,500,2000)"
+            ) from None
+        if number <= 0:
+            raise argparse.ArgumentTypeError(
+                f"{number} — объём должен быть больше нуля; --orders принимает целые >0 через запятую"
+            )
+        volumes.append(number)
+    return volumes
+
+
+def write_file(path: str, text: str, what: str) -> int | None:
+    """Пишет файл, создавая родительские каталоги; при ошибке — сообщение и код 2."""
+    target = Path(path)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+    except OSError as error:
+        print(f"Не удалось записать {what} в {target}: {error}", file=sys.stderr)
+        return 2
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Симуляция дня сети ПВЗ")
-    parser.add_argument("--orders", default=None, help="список объёмов через запятую (по умолчанию из params)")
+    parser.add_argument(
+        "--orders",
+        type=positive_orders,
+        default=None,
+        metavar="N[,M…]",
+        help="объёмы через запятую, целые >0 (по умолчанию из params)",
+    )
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--p-local", type=float, default=None, help="доля заказов без хаба (по умолчанию из params)")
     parser.add_argument("--params", default=None)
@@ -250,7 +291,7 @@ def main() -> int:
 
     params = load_params(args.params or ROOT / "economics" / "params.yaml")
     volumes = (
-        [int(part) for part in args.orders.split(",") if part.strip()]
+        list(args.orders)
         if args.orders
         else [int(value) for value in params["network"]["simulation_orders"]]
     )
@@ -263,9 +304,13 @@ def main() -> int:
     runs = [simulate_day(params, orders=volume, seed=seed, p_local=p_local) for volume in volumes]
 
     if args.json:
-        Path(args.json).write_text(json.dumps(runs, ensure_ascii=False, indent=2), encoding="utf-8")
+        code = write_file(args.json, json.dumps(runs, ensure_ascii=False, indent=2), "JSON")
+        if code is not None:
+            return code
     if args.write_md:
-        Path(args.write_md).write_text(build_markdown(params, runs, seed), encoding="utf-8")
+        code = write_file(args.write_md, build_markdown(params, runs, seed), "markdown")
+        if code is not None:
+            return code
 
     for run in runs:
         mesh = run["modes"]["mesh"]

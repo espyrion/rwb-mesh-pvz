@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .. import money, routing, storage
 from ..clock import now
-from ..db import get_db
+from ..db import begin_immediate, get_db
 from ..models import Item, Order, Pvz
 from ..notify import notify
 from ..serializers import order_dict, route_dict
@@ -16,6 +16,9 @@ router = APIRouter(tags=["returns"])
 
 @router.post("/orders/{order_id}/return")
 def return_order(order_id: int, db: Session = Depends(get_db)):
+    # Блокировка записи до чтения статуса: параллельные возвраты выстраиваются в очередь,
+    # второй видит status=returned и получает идемпотентный ответ (без повторного списания).
+    begin_immediate(db)
     order = db.get(Order, order_id)
     if order is None:
         raise HTTPException(404, "order not found")

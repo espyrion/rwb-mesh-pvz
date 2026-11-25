@@ -228,6 +228,8 @@ def get_item(item_id: int, db: Session = Depends(get_db)):
 
 @router.post("/items/{item_id}/relocate")
 def relocate_item(item_id: int, payload: RelocateRequest, db: Session = Depends(get_db)):
+    # Блокировка записи: иначе параллельные relocate дублируют проводки и двоят занятые ячейки.
+    begin_immediate(db)
     item = db.get(Item, item_id)
     if item is None:
         raise HTTPException(404, "item not found")

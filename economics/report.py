@@ -10,12 +10,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from economics.model import (
+    compare,
     intercity_economics,
     load_params,
     order_economics,
     pct_change,
     queue_wait_hours,
     route_cost,
+    route_hours,
 )
 from economics.network import queue_load_table, simulate_day
 from economics.scenario import (
@@ -75,8 +77,9 @@ def party_rows(scenario: dict) -> str:
     )
 
 
-def build() -> str:
-    params = load_params()
+def build(params: dict | None = None) -> str:
+    if params is None:
+        params = load_params()
     fees = params["fees"]
     pv = params["pvz"]
     lg = params["logistics"]
@@ -92,14 +95,9 @@ def build() -> str:
     mesh = order_economics(params, kind="mesh", goods_rub=goods, cells=cells, storage_days=storage_days)
     hub = order_economics(params, kind="hub", goods_rub=goods, cells=cells, storage_days=storage_days)
     intercity = intercity_economics(params, goods_rub=goods, cells=cells, storage_days=storage_days)
-    cmp_city = {
-        "buyer_delta_rub": round(mesh["buyer"]["total_rub"] - hub["buyer"]["total_rub"], 2),
-        "buyer_delta_pct": pct_change(mesh["buyer"]["total_rub"], hub["buyer"]["total_rub"]),
-        "buyer_delta_hours": round(mesh["buyer"]["hours"] - hub["buyer"]["hours"], 2),
-        "buyer_delta_hours_pct": pct_change(mesh["buyer"]["hours"], hub["buyer"]["hours"]),
-    }
+    cmp_city = compare(params, hub, mesh)
     cmp_ic = intercity["compare"]
-    city_be = pvz_breakeven_ops(params, mesh_share=day_share) or 0
+    city_be = pvz_breakeven_ops(params, mesh_share=day_share)
     storage_be = storage_breakeven_days(params)
     day = pvz_day(params, ops=day_ops, mesh_share=day_share)
     capacity = int(pv["ops_per_day_capacity"])
@@ -123,8 +121,18 @@ def build() -> str:
     returned = order_economics(
         params, kind="mesh", goods_rub=goods, cells=cells, storage_days=storage_days, returned=True
     )
-    incident_mp = round(
-        mesh["marketplace"]["profit_rub"] - route_cost(params, "mesh"), 2
+    # Инцидент: сегмент отключён, заказ объезжает город через хаб. Всё считается
+    # из модели: перепробег, маржа МП и срок — разницы hub и mesh, а вердикт по
+    # SLA сравнивается с порогом просрочки late_threshold_hours.
+    incident_detour = round(route_cost(params, "hub") - route_cost(params, "mesh"), 2)
+    incident_mp = round(hub["marketplace"]["profit_rub"] - incident_detour, 2)
+    incident_delta_hours = round(route_hours(params, "hub") - route_hours(params, "mesh"), 1)
+    incident_threshold = float(fees["late_threshold_hours"])
+    incident_sla_ok = incident_delta_hours <= incident_threshold
+    incident_sla_text = (
+        "SLA сохраняется"
+        if incident_sla_ok
+        else f"SLA не сохраняется: срок +{hours(incident_delta_hours)} ч против порога {num(incident_threshold)} ч"
     )
 
     sim_runs = [
@@ -164,17 +172,90 @@ def build() -> str:
         for row in queue
     )
     chain_words = "прибыльнее" if cmp_ic["chain_more_profitable"] else "менее прибыльна"
-    city_chain_words = (
-        "прибыльнее" if (mesh["chain"]["profit_rub"] - hub["chain"]["profit_rub"]) > 0 else "менее прибыльна"
-    )
+    city_chain_words = "прибыльнее" if cmp_city["chain_more_profitable"] else "менее прибыльна"
+    share_words = "не ограничивает" if cmp_ic["chain_more_profitable"] else "ограничивает"
+    viable_words = "приемлема" if cmp_city["viable"] else "не приемлема"
     mp_margin_pct = mesh["marketplace"]["margin_pct"]
-    penalty_share_margin = round(float(fees["late_penalty_rub"]) / mesh["marketplace"]["profit_rub"] * 100.0, 2)
-    penalty_share_gmv = round(float(fees["late_penalty_rub"]) / goods * 100.0, 2)
+    # Штраф сопоставляется с маржой МП: при неположительной марже доля не имеет
+    # смысла (деление на ноль или отрицательное «−104% маржи»).
+    penalty_rub = float(fees["late_penalty_rub"])
+    if mesh["marketplace"]["profit_rub"] > 0:
+        penalty_share_margin = round(penalty_rub / mesh["marketplace"]["profit_rub"] * 100.0, 2)
+        penalty_margin_text = f"{pct_plain(penalty_share_margin)} маржи"
+        penalty_margin_short = pct_plain(penalty_share_margin)
+    else:
+        penalty_share_margin = None
+        penalty_margin_text = "штраф превышает маржу"
+        penalty_margin_short = "штраф превышает маржу"
+    penalty_share_gmv = round(penalty_rub / goods * 100.0, 2) if goods else 0.0
+
+    # Порог безубыточности ПВЗ может быть недостижим (None): это не 0 операций,
+    # а «выше потолка мощности». Печатаем словами, а не подставляем ноль.
+    if city_be is None:
+        city_be_text = f"недостижим при {capacity} операциях/день"
+        city_be_ops_text = "недостижим"
+        city_be_share_text = "порог выше мощности"
+        city_be_reserve_text = "запаса нет: постоянные затраты не покрываются"
+    else:
+        city_be_text = f"**{city_be} операциях в день**"
+        city_be_ops_text = str(city_be)
+        city_be_share_text = f"{pct_plain(city_be / capacity * 100)} мощности"
+        city_be_reserve_text = f"запас {capacity - city_be} операций"
+    # Порог хранения недостижим, если тариф нулевой или продавец уже в минусе.
+    storage_be_text = (
+        f"**{money(storage_be)} днях**"
+        if storage_be is not None
+        else "порог хранения недостижим"
+    )
+    storage_be_short = money(storage_be) if storage_be is not None else "недостижим"
+    city_be_conclusion = (
+        f"**{city_be} операций/день**" if city_be is not None else f"**недостижим при {capacity} операциях/день**"
+    )
+    storage_be_conclusion = (
+        f"**{money(storage_be)} дней**" if storage_be is not None else "**порог недостижим**"
+    )
+    # Шаг таблицы чувствительности: одна точка — шага нет, а не IndexError.
+    if len(sensitivity) < 2:
+        sens_step_text = "одна точка — шаг не задан"
+        sens_range_text = pct_plain(sensitivity[0]["share_pct"])
+    else:
+        sens_step_text = pct_plain(sensitivity[1]["share_pct"] - sensitivity[0]["share_pct"])
+        sens_range_text = (
+            f"{pct_plain(sensitivity[0]['share_pct'])}–{pct_plain(sensitivity[-1]['share_pct'])}"
+        )
+    sens_last_be = sensitivity[-1]["pvz_breakeven_ops"]
+    sens_first_be = sensitivity[0]["pvz_breakeven_ops"]
+    chain_delta_word = (
+        "положительна" if chain_be["chain_delta_per_order_rub"] > 0 else "отрицательна"
+        if chain_be["chain_delta_per_order_rub"] < 0
+        else "нулевая"
+    )
+    if cmp_ic["chain_more_profitable"]:
+        share_limit_text = "ограничение — мощность точек и очередь (раздел 6.3), а не выгода заказа"
+    else:
+        share_limit_text = (
+            "при доле выше "
+            f"{pct_plain(chain_be['share_pct'])} цепочка теряет против схемы «только хаб»"
+        )
+    if sens_last_be is None or sens_first_be is None:
+        sens_breakeven_text = (
+            "порог безубыточности ПВЗ при крайних долях недостижим"
+            if len(sensitivity) > 1
+            else "порог безубыточности ПВЗ недостижим"
+        )
+    else:
+        sens_breakeven_text = (
+            f"При доле {pct_plain(sensitivity[-1]['share_pct'])} ПВЗ выходит в ноль уже при "
+            f"{sens_last_be} операциях/день вместо {sens_first_be} при "
+            f"{pct_plain(sensitivity[0]['share_pct'])}."
+        )
 
     text = f"""# Экономическая модель и отчёт о расчётах
 
-> **Дисклеймер.** Все тарифы, бонусы, штрафы и лимиты ответственности в этом документе — параметры
+> **Дисклеймер.** Все тарифы, бонусы и штрафы в этом документе — параметры
 > предложенной командой модели. Они не являются действующими тарифами RWB или его партнёров.
+> Лимиты ответственности за утрату/порчу в модель не включены — вынесены в этап 0 пилота
+> (`docs/REPLICATION.md`).
 > Данные синтетические; реальные перевозки, платежи и доступы к производственным системам не используются.
 > Источник параметров: `economics/params.yaml` (версия в репозитории). Отчёт пересобирается командой
 > `python economics/report.py`; тест `economics/tests/test_report.py` сверяет файл с моделью.
@@ -198,7 +279,7 @@ def build() -> str:
 **GMV и маржа — разные величины.** GMV — цена товара; маржа маркетплейса считается в процентах от GMV,
 маржа продавца — от его выручки, маржа ПВЗ — от его дохода. Штраф SLA ({money(fees['late_penalty_rub'])} ₽)
 сопоставляется с маржой маркетплейса ({money(mesh['marketplace']['profit_rub'])} ₽ на заказ), а не с ценой
-товара: это {pct_plain(penalty_share_margin)} маржи и {pct_plain(penalty_share_gmv)} GMV.
+товара: это {penalty_margin_text} и {pct_plain(penalty_share_gmv)} GMV.
 
 ## 2. Допущения и единицы
 
@@ -304,7 +385,8 @@ def build() -> str:
 хранение {money(mesh['seller']['costs']['storage'])} ₽) — переводы, а не новые затраты цепочки.
 Итог продавца — {money(mesh['seller']['profit_rub'])} ₽ при марже {pct_plain(mesh['seller']['margin_pct'])}.
 
-Схема приемлема: `viable = {cmp_city['buyer_delta_pct'] < 0 and cmp_city['buyer_delta_hours'] < 0}`;
+Схема {viable_words}: `viable = {cmp_city['viable']}` (`compare()` проверяет и приёмочные границы
+покупателя, и неотрицательную прибыль ПВЗ, маркетплейса и продавца);
 лимиты `buyer_acceptance` — {money(acc['max_cost_increase_pct'])}% и {money(acc['max_time_increase_hours'])} ч.
 
 ## 5. Межгородской заказ
@@ -339,13 +421,13 @@ def build() -> str:
 
 При фиксированных затратах {money(pv['fixed_cost_day_rub'])} ₽/день и вкладе с заказа
 (вознаграждение + хранение + доля mesh-бонуса − переменные затраты) ПВЗ выходит в ноль при
-**{city_be} операциях в день**. Пропускная способность — {capacity} операций/день,
-то есть {pct_plain(city_be / capacity * 100)} мощности и запас {capacity - city_be} операций.
+{city_be_text}. Пропускная способность — {capacity} операций/день,
+то есть {city_be_share_text} и {city_be_reserve_text}.
 
 | Загрузка ПВЗ | Операций/день | Прибыль ПВЗ/день, ₽ |
 |---|---|---|
 | Рабочая | {day_ops} | {money(day['profit_rub'])} |
-| Порог безубыточности | {city_be} | ≈ 0 |
+| Порог безубыточности | {city_be_ops_text} | ≈ 0 |
 | Полная мощность | {capacity} | {money(pvz_day(params, ops=capacity, mesh_share=day_share)['profit_rub'])} |
 
 ### 6.2 Порог длительного хранения для продавца
@@ -353,7 +435,7 @@ def build() -> str:
 Плата за хранение — перевод: маркетплейс получает её с продавца и передаёт ПВЗ, поэтому его маржа от срока
 не зависит, а риск несёт продавец. Плата растёт линейно: {money(pv['storage_rate_day_rub'])} ₽ × {num(cells)} ячейки =
 {money(pv['storage_rate_day_rub'] * cells)} ₽/день. При сроке {num(storage_days)} дня продавец зарабатывает
-{money(mesh['seller']['profit_rub'])} ₽ на заказе, а при **{money(storage_be)} днях** его прибыль
+{money(mesh['seller']['profit_rub'])} ₽ на заказе, а при {storage_be_text} его прибыль
 обнуляется. Отсюда правило: на {pv['long_storage_threshold_days']} день — уведомление ПВЗ и предложение
 перемещения за {money(pv['relocation_cost_rub'])} ₽; дальше — решение оператора (перемещение/уценка/возврат).
 Для сравнения, при {pv['long_storage_threshold_days']} днях хранения прибыль продавца падает до
@@ -380,8 +462,8 @@ def build() -> str:
 
 ### 6.4 Чувствительность к доле локальных пар
 
-Расчёт по заказу при долях {pct_plain(sensitivity[0]['share_pct'])}–{pct_plain(sensitivity[-1]['share_pct'])}
-с шагом {pct_plain(sensitivity[1]['share_pct'] - sensitivity[0]['share_pct'])} (`network.sensitivity_mesh_share_pct`),
+Расчёт по заказу при долях {sens_range_text}
+с шагом {sens_step_text} (`network.sensitivity_mesh_share_pct`),
 объём сети — {params['network']['sensitivity_orders']} заказов/день.
 
 | Доля mesh | Прибыль цепочки/заказ, ₽ | Прибыль сети, ₽ | Прибыль ПВЗ/день, ₽ | Безубыточность ПВЗ, оп/день |
@@ -390,16 +472,15 @@ def build() -> str:
 
 **Точка безубыточности mesh-схемы по доле локальных пар — {pct_plain(chain_be['share_pct'])}**:
 прибыль цепочки на заказ линейна по доле, `hub + s × (mesh − hub)`, а разница
-{money(chain_be['chain_delta_per_order_rub'])} ₽ положительна. То есть экономика заказа не ограничивает
-долю: ограничение — мощность точек и очередь (раздел 6.3), а не выгода заказа. При доле
-{pct_plain(sensitivity[-1]['share_pct'])} ПВЗ выходит в ноль уже при {sensitivity[-1]['pvz_breakeven_ops']}
-операциях/день вместо {sensitivity[0]['pvz_breakeven_ops']} при {pct_plain(sensitivity[0]['share_pct'])}.
+{money(chain_be['chain_delta_per_order_rub'])} ₽ {chain_delta_word}. То есть экономика заказа {share_words}
+долю: {share_limit_text}.
+{sens_breakeven_text}
 
 ## 7. Срыв сроков: штраф, отмены и пиковый курьер
 
 Штраф SLA — {money(fees['late_penalty_rub'])} ₽ — берётся с маркетплейса и сопоставляется с его маржой
 ({money(mesh['marketplace']['profit_rub'])} ₽ на заказ), а не с GMV ({money(goods)} ₽). Это
-{pct_plain(penalty_share_margin)} маржи и {pct_plain(penalty_share_gmv)} GMV.
+{penalty_margin_text} и {pct_plain(penalty_share_gmv)} GMV.
 
 Просроченный заказ отменяется с вероятностью {pct_plain(float(fees['late_cancel_rate']) * 100)}
 (`late_cancel_rate`). Отмена — не только штраф: цепочка теряет маржу всех сторон и платит обратную
@@ -423,7 +504,7 @@ def build() -> str:
 |---|---|---|---|---|---|
 | Возврат после выдачи | {money(returned['pvz']['profit_rub'])} ₽ (удержание {money(fees['return_reverse_fee_rub'])} ₽) | {money(returned['marketplace']['profit_rub'])} ₽ (обратная логистика {money(route_cost(params, 'mesh'))} ₽) | {money(returned['seller']['profit_rub'])} ₽ | теряет доставку {money(fees['buyer_delivery_fee_local_rub'])} ₽ | обратная логистика — внешняя затрата цепочки; удержания — переводы |
 | Длительное хранение ({pv['long_storage_threshold_days']} дней) | {money(long_storage['pvz']['profit_rub'])} ₽ | {money(long_storage['marketplace']['profit_rub'])} ₽ | {money(long_storage['seller']['profit_rub'])} ₽ | без изменений | нужен порог и перемещение остатка |
-| Инцидент: сегмент отключён | без изменений | {money(incident_mp)} ₽ (перепробег {money(route_cost(params, 'mesh'))} ₽) | без изменений | срок +{hours(lg['local_delivery_hours'])} ч | автоперевыбор маршрута сохраняет SLA |
+| Инцидент: сегмент отключён | без изменений | {money(incident_mp)} ₽ (перепробег {money(incident_detour)} ₽) | без изменений | срок +{hours(incident_delta_hours)} ч | {incident_sla_text} |
 | Пиковая перегрузка | без изменений | штраф {money(fees['late_penalty_rub'])} ₽ + отмены | без изменений | отмена заказа | порог 80–85% и слоты приёмки |
 
 ## 9. Что не включено в прототип
@@ -447,9 +528,9 @@ def build() -> str:
 2. Для межгорода схема работает только при предварительном размещении остатка; итог маркетплейса {signed(cmp_ic['marketplace_delta_rub']).replace('-', '−')} ₽
    (+{money(lg['trunk_cost_per_order_rub'] + cmp_ic['marketplace_delta_rub'])} ₽ экономии города − {money(lg['trunk_cost_per_order_rub'])} ₽ магистраль),
    а покупатель и цепочка выигрывают.
-3. ПВЗ становится устойчиво выгодным при загрузке от **{city_be} операций/день**; ниже порога схема требует
+3. ПВЗ становится устойчиво выгодным при загрузке от {city_be_conclusion}; ниже порога схема требует
    субсидии. Рабочий потолок — {money(threshold['target'])}–{money(threshold['alert'])}% мощности по очереди.
-4. Длительное хранение свыше **{money(storage_be)} дней** делает заказ убыточным для продавца — порог и
+4. Длительное хранение свыше {storage_be_conclusion} делает заказ убыточным для продавца — порог и
    правило перемещения встроены в продукт.
 5. Переводы между сторонами не увеличивают прибыль цепочки: выигрыш возникает только за счёт исключения
    лишнего хаба/магистрали и роста утилизации ПВЗ. Штраф и отмены — потери маржи, а не цены товара.
