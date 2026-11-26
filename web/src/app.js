@@ -1,4 +1,4 @@
-/* Mesh-ПВЗ — единое приложение с ролями ПВЗ и продавца (vanilla JS, без сборки). */
+/* Mesh-ПВЗ — единое приложение: 4 изолированных кабинета (покупатель, продавец, ПВЗ, маркетплейс) (vanilla JS, без сборки). */
 const API = "/api/v1";
 
 const state = {
@@ -10,7 +10,9 @@ const state = {
   incidents: [],
   pvzId: 1,
   sellerId: 1,
-  page: "dashboard",
+  page: "buyer",
+  role: localStorage.getItem("meshCabinet") || "buyer",
+  now: null,
   ledgerOrderId: null,
   compare: null,
   buyerCode: "",
@@ -48,8 +50,10 @@ const dt = (iso) => (iso ? new Date(iso).toLocaleString("ru-RU", { day: "2-digit
 
 const ROLE_KEYS = { admin: "demo-admin-key", seller: "demo-seller-key", pvz: "demo-pvz-key" };
 
+/* Демо: кабинеты работают под ключом маркетплейса — покупатель оформляет заказ, ПВЗ и продавец
+   вызывают операции разных ролей из одного интерфейса. */
 function apiKey() {
-  return ROLE_KEYS[localStorage.getItem("meshRole") || "admin"] || ROLE_KEYS.admin;
+  return ROLE_KEYS.admin;
 }
 
 async function api(path, options = {}) {
@@ -184,6 +188,7 @@ async function loadCatalog() {
   state.orders = orders;
   state.edges = edges;
   state.incidents = incidents;
+  state.now = clock.virtual_now;
   $("#clock-badge").textContent = "Виртуальное время: " + dt(clock.virtual_now);
   if (!pvz.some((row) => row.id === state.pvzId && !row.is_hub)) state.pvzId = (pvz.find((row) => !row.is_hub) || pvz[0]).id;
   if (!sellers.some((row) => row.id === state.sellerId)) state.sellerId = sellers[0] ? sellers[0].id : 1;
@@ -1583,19 +1588,51 @@ new MutationObserver(() => {
 }).observe(document.getElementById("page"), { childList: true, subtree: true });
 
 /* ---------- роутинг ---------- */
+const ROLE_META = {
+  buyer: { label: "Покупатель", home: "buyer", subtitle: "Оформление и отслеживание заказов" },
+  seller: { label: "Продавец", home: "seller", subtitle: "Поставки, остатки по ПВЗ и прибыль" },
+  pvz: { label: "ПВЗ", home: "pvz", subtitle: "Загрузка, задания маркетплейса, приёмка и выдача" },
+  admin: { label: "Маркетплейс", home: "dashboard", subtitle: "Система решает, как везти заказ" },
+};
+const ROLE_PAGES = {
+  buyer: ["buyer"], seller: ["seller"], pvz: ["pvz"],
+  admin: ["dashboard", "map", "economics", "ledger", "incidents", "demo"],
+};
 const pages = {
-  dashboard: { title: "Дашборд", subtitle: "Сводка по сети ПВЗ и денежным потокам", render: renderDashboard },
+  buyer: { title: "Кабинет покупателя", subtitle: ROLE_META.buyer.subtitle, render: renderBuyerCab },
+  seller: { title: "Кабинет продавца", subtitle: ROLE_META.seller.subtitle, render: renderSellerCab },
+  pvz: { title: "Кабинет ПВЗ", subtitle: ROLE_META.pvz.subtitle, render: renderPvzCab },
+  dashboard: { title: "Дашборд", subtitle: "Сводка по сети, денежные потоки и маршруты заказов", render: renderAdminDashboard },
   map: { title: "Карта сети", subtitle: "Схема ПВЗ, сегментов и маршрутов: отказ узла прямо на карте", render: () => renderMap() },
-  economics: { title: "Экономика", subtitle: "Что если: ставки, прибыль четырёх сторон, порог безубыточности", render: renderEconomics },
-  pvz: { title: "Кабинет ПВЗ", subtitle: "Приёмка, остатки, хранение и доходы точки", render: renderPvz },
-  seller: { title: "Кабинет продавца", subtitle: "Остатки, заказы и расчёты продавца", render: renderSeller },
-  orders: { title: "Заказы", subtitle: "Маршрут, сборка, выдача, возврат", render: renderOrders },
-  buyer: { title: "Покупатель", subtitle: "Отслеживание заказа по ссылке без входа в систему", render: renderBuyer },
-  routes: { title: "Маршруты и сеть", subtitle: "mesh против хаба и управление сегментами", render: renderRoutes },
-  incidents: { title: "Инциденты", subtitle: "Нештатные ситуации и перевыбор маршрута", render: renderIncidents },
-  clock: { title: "Время и уведомления", subtitle: "Виртуальные часы, начисления, лента событий", render: renderClock },
+  economics: { title: "Экономика", subtitle: "Зелёная зона 4 сторон и бонус ПВЗ", render: renderEconomics },
+  ledger: { title: "Журнал проводок", subtitle: "Ledger: начисления по сторонам", render: renderLedger },
+  incidents: { title: "Инциденты", subtitle: "Отказ узла и перевыбор маршрута", render: renderIncidents },
   demo: { title: "Демо-кокпит", subtitle: "5 обязательных + 2 расширенных сценария на живом API: PASS/FAIL и лог различий", render: async () => renderDemo() },
 };
+
+function applyRole() {
+  if (!ROLE_PAGES[state.role]) state.role = "buyer";
+  if (!ROLE_PAGES[state.role].includes(state.page)) state.page = ROLE_META[state.role].home;
+  document.body.dataset.role = state.role;
+  const nav = $("#nav");
+  if (nav) nav.hidden = state.role !== "admin";
+  document.querySelectorAll(".role-btn").forEach((b) => {
+    const on = b.dataset.role === state.role;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  const badge = $("#role-badge");
+  if (badge) badge.textContent = ROLE_META[state.role].label;
+}
+
+function setRole(role, page) {
+  state.role = role;
+  localStorage.setItem("meshCabinet", role);
+  state.page = page || ROLE_META[role].home;
+  state.ledgerOrderId = null;
+  applyRole();
+}
+
 
 /* ---------- поколение рендера ---------- */
 /* Навигация и действия могут запустить render() несколько раз подряд, а внутри
@@ -1634,10 +1671,12 @@ function rerenderPage(fn) {
    и медленный ответ прошлой страницы не должен затирать текущую. */
 async function render() {
   const my = ++renderSeq;
+  applyRole();
   const page = pages[state.page];
   const container = $("#page");
   /* Ошибка поиска покупателя живёт только на странице «Покупатель». */
   if (state.page !== "buyer") state.buyerError = null;
+  if (state.page === "buyer" && !state.buyerData) state.buyerError = null;
   container.classList.add("is-loading");
   try {
     await loadCatalog();
@@ -1674,6 +1713,19 @@ function focusPageTitle() {
 }
 
 document.addEventListener("click", async (event) => {
+  const roleBtn = event.target.closest(".role-btn");
+  if (roleBtn) {
+    setRole(roleBtn.dataset.role);
+    await render();
+    focusPageTitle();
+    return;
+  }
+  if (event.target.closest("[data-quick=demo]")) {
+    setRole("admin", "demo");
+    await render();
+    focusPageTitle();
+    return;
+  }
   const nav = event.target.closest(".nav-item");
   if (nav) {
     state.page = nav.dataset.page;
@@ -1786,18 +1838,9 @@ document.addEventListener("click", async (event) => {
 
 $("#refresh").addEventListener("click", render);
 
-const roleSelect = $("#role-select");
-if (roleSelect) {
-  roleSelect.value = localStorage.getItem("meshRole") || "admin";
-  roleSelect.addEventListener("change", () => {
-    localStorage.setItem("meshRole", roleSelect.value);
-    location.reload();
-  });
-}
-
 const deepLink = new URLSearchParams(location.search).get("track");
 if (deepLink) {
-  state.page = "buyer";
+  setRole("buyer");
   state.buyerCode = deepLink.trim().toLowerCase();
   api(`/track/${encodeURIComponent(state.buyerCode)}`)
     .then((data) => { state.buyerData = data; })

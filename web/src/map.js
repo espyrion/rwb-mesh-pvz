@@ -374,7 +374,7 @@ async function mapAction(action, id) {
   }
   if (action === "open-pvz") {
     state.pvzId = id;
-    state.page = "pvz";
+    setRole("pvz");
     render();
     return;
   }
