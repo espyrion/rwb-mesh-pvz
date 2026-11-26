@@ -309,7 +309,7 @@ function schemeCard(title, scheme, win) {
       <div class="scheme-head"><span class="route-badge ${scheme.kind === "mesh" ? "mesh" : "hub"}">${esc(scheme.kind === "mesh" ? "MESH" : "ХАБ")}</span>
         <b>${rub(scheme.total_cost_rub)} · ${dec(scheme.total_hours)} ч</b>${win ? '<span class="pill">выбран API</span>' : ""}</div>
       <ul class="legs">${legs || "<li>без сегментов</li>"}</ul>
-      <div class="hint">${esc(title)}: ${segWord((scheme.segments || []).length)}, себестоимость логистики складывается из них</div>
+      <div class="hint">${esc(title)} · ${segWord((scheme.segments || []).length)}, себестоимость логистики складывается из них.${scheme.kind === "hub" ? " Хаб в модели — консолидированная ставка обработки: своего хранения на нём нет, товар идёт со склада маркетплейса через перевалку." : " Товар уже лежит в пункте города получателя, поэтому хаб и магистраль не задействованы."}</div>
     </div>`;
 }
 
@@ -318,8 +318,8 @@ function compareBlock(cmp) {
   const pct = (o) => (o ? dec(o.utilization_pct) + "%" : "—");
   const triggered = (load.triggered_by || []).map((r) => `${esc(r.code)} ${dec(r.utilization_pct)}%`).join(", ");
   return `<div class="grid cols-2">
-      ${schemeCard("Локально ПВЗ→ПВЗ", cmp.mesh, cmp.chosen === "mesh")}
-      ${schemeCard("Через хаб и магистраль", cmp.hub, cmp.chosen === "hub")}
+      ${schemeCard("Из остатка в ПВЗ города — склад не нужен", cmp.mesh, cmp.chosen === "mesh")}
+      ${schemeCard("Со склада маркетплейса: хаб + магистраль + последняя миля", cmp.hub, cmp.chosen === "hub")}
     </div>
     <div class="card"><h2>Решение API: ${esc(cmp.reason_code || "—")}</h2>
       <p>${esc(cmp.reason || "—")}</p>
@@ -359,7 +359,13 @@ async function renderRouting() {
     `Доставка покупателю: ${money(m.params.buyer_delivery_fee_local_rub)} против ${money(m.params.buyer_delivery_fee_hub_rub)}`,
   ];
   pageBox().innerHTML = `
-    <div class="card accent"><h2>Как маркетплейс выбирает, как везти заказ</h2>
+    <div class="card accent"><h2>Склад или ПВЗ-сеть: что выгоднее</h2>
+      <div class="split mt">
+        <div class="split-row"><span>Из остатка в ПВЗ города (mesh)</span><div class="bar"><span style="width:${Math.round((sc.mesh.route.cost_rub / sc.hub.route.cost_rub) * 100)}%"></span></div><b>${rub(sc.mesh.route.cost_rub)}</b><span class="muted small">${dec(sc.mesh.route.hours)} ч</span></div>
+        <div class="split-row"><span>Со склада через хаб (магистраль)</span><div class="bar"><span style="width:${Math.round((sc.hub.route.cost_rub / sc.hub.route.cost_rub) * 100)}%"></span></div><b>${rub(sc.hub.route.cost_rub)}</b><span class="muted small">${dec(sc.hub.route.hours)} ч</span></div>
+      </div>
+      <p class="hint mt">Вывод: доставлять из остатка, который уже лежит в ПВЗ города, дешевле на <strong>${rub2(logist)}</strong> и быстрее на <strong>${dec(Math.abs(sc.mesh.route.hours - sc.hub.route.hours))} ч</strong>. Склад маркетплейса при этом не расширяется — товар едет из соседнего пункта.</p></div>
+    <div class="card"><h2>Как маркетплейс выбирает, как везти заказ</h2>
       <p class="hint">API считает обе схемы по одному набору тарифов и берёт дешёвую, соблюдая ограничения: есть ли локальный сегмент, активны ли узлы, не перегружена ли точка. Ниже — тот же расчёт, что при оформлении заказа: <span class="mono">GET /api/v1/routes/compare</span>.</p>
       <div class="form-row mt">
         <label>Откуда<select id="cmp-from">${sel.from}</select></label>
