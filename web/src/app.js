@@ -190,7 +190,8 @@ async function loadCatalog() {
   state.incidents = incidents;
   state.now = clock.virtual_now;
   $("#clock-badge").textContent = "Виртуальное время: " + dt(clock.virtual_now);
-  if (!pvz.some((row) => row.id === state.pvzId && !row.is_hub)) state.pvzId = (pvz.find((row) => !row.is_hub) || pvz[0]).id;
+  /* Хаб — тоже выбираемый узел в кабинете ПВЗ: сбрасываем выбор, только если такой точки нет вообще. */
+  if (!pvz.some((row) => row.id === state.pvzId)) state.pvzId = (pvz.find((row) => !row.is_hub) || pvz[0]).id;
   if (!sellers.some((row) => row.id === state.sellerId)) state.sellerId = sellers[0] ? sellers[0].id : 1;
 }
 

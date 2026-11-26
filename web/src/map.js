@@ -288,7 +288,7 @@ function mapPanelHtml() {
            : node.is_active
              ? `<button class="btn danger small" data-map-action="down" data-id="${node.id}">Вывести из строя</button>`
              : `<button class="btn good small" data-map-action="up" data-id="${node.id}">Вернуть в строй</button>`}
-         ${node.is_hub ? "" : `<button class="btn ghost small" data-map-action="open-pvz" data-id="${node.id}">Кабинет ПВЗ</button>`}
+         <button class="btn ghost small" data-map-action="open-pvz" data-id="${node.id}">${node.is_hub ? "Кабинет узла (хаб)" : "Кабинет ПВЗ"}</button>
        </div>`
     : `<div class="section-title"><h2>Сводка сети</h2></div>
        <div class="list">

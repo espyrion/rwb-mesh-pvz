@@ -155,7 +155,16 @@ async function renderPvzCab() {
   const thr = m.queue_threshold ? m.queue_threshold.alert_pct : 85;
   const rating = pvz.audit_sla_rating ?? pvz.sla_rating ?? "—";
   const over = pvz.utilization_pct >= thr;
+  const isHub = !!pvz.is_hub;
   const mine = state.orders;
+  /* Хаб — узел графа: заказов «на нём» не лежит, но через него проходят сегменты магистрали.
+     Находим межгородские заказы по коду хаба в сегментах маршрута. */
+  const hubLeg = (o) => (o.route && o.route.segments ? o.route.segments.find((s) => s.to_code === pvz.code || s.from_code === pvz.code) || null : null);
+  const viaHub = isHub ? mine.filter((o) => hubLeg(o)) : [];
+  const hubWait = viaHub.filter((o) => o.status === "assembled");
+  const hubWay = viaHub.filter((o) => o.status === "in_transit");
+  const hubRouted = viaHub.filter((o) => ["routed", "rerouted"].includes(o.status));
+  const trunkSum = viaHub.reduce((sum, o) => sum + (hubLeg(o) ? hubLeg(o).cost_rub : 0), 0);
   const toCollect = mine.filter((o) => o.from_pvz === pvz.id && ["routed", "rerouted"].includes(o.status));
   /* Межгородской (hub) заказ нельзя выдать из «Собран»: сначала передача курьеру (transit).
      Локальный mesh-заказ API разрешает выдать сразу после сборки. */
@@ -163,16 +172,28 @@ async function renderPvzCab() {
   const toIssue = mine.filter((o) => o.to_pvz === pvz.id && (o.status === "in_transit" || (o.status === "assembled" && o.route && o.route.kind === "mesh")));
   const task = (o, label, action, cls, what) => `<div class="task"><div><strong>${esc(o.code)}</strong> · ${esc(o.title || o.sku)} × ${o.qty}<br><span class="muted small">${what} · ${esc(o.from_code)} → ${esc(o.to_code)}</span></div>
     <button class="btn big ${cls}" data-action="${action}" data-id="${o.id}">${label}</button></div>`;
-  const tasks = [
-    ...toCollect.map((o) => task(o, "Собрать", "assemble", "", "принять у продавца и уложить в ячейки")),
-    ...toTransit.map((o) => task(o, "В путь", "transit", "", `передать курьеру: магистраль ${dec(o.route.total_hours)} ч, ${money(o.route.total_cost_rub)} — выдача после отправки`)),
-    ...toIssue.map((o) => task(o, "Выдать", "issue", "good", "выдать покупателю")),
-  ].join("");
+  const info = (o, what) => `<div class="task"><div><strong>${esc(o.code)}</strong> · ${esc(o.title || o.sku)} × ${o.qty}<br><span class="muted small">${what} · ${esc(o.from_code)} → ${esc(o.to_code)}</span></div><span class="pill">${esc(o.status === "in_transit" ? "в пути" : "ожидает сборки")}</span></div>`;
+  const tasks = isHub
+    ? [
+        ...hubWait.map((o) => task(o, "Переадресовать в магистраль", "transit", "", `собран в ${esc(o.from_code)}; магистраль ${dec(o.route.total_hours)} ч, ${money(o.route.total_cost_rub)} — после отправки заказ можно выдать`)),
+        ...hubWay.map((o) => info(o, "передан в магистраль")),
+        ...hubRouted.map((o) => info(o, "сначала сборка в ПВЗ-источнике")),
+      ].join("")
+    : [
+        ...toCollect.map((o) => task(o, "Собрать", "assemble", "", "принять у продавца и уложить в ячейки")),
+        ...toTransit.map((o) => task(o, "В путь", "transit", "", `передать курьеру: магистраль ${dec(o.route.total_hours)} ч, ${money(o.route.total_cost_rub)} — выдача после отправки`)),
+        ...toIssue.map((o) => task(o, "Выдать", "issue", "good", "выдать покупателю")),
+      ].join("");
   const sellers = state.sellers.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
   pageBox().innerHTML = `
     <div class="section-title"><h2>${esc(pvz.code)} · ${esc(pvz.name)}</h2>
-      <label>Точка<select id="pvz-select">${pvzOptions(pvz.id)}</select></label></div>
+      <label>${isHub ? "Узел сети" : "Точка"}<select id="pvz-select">${pvzOptions(pvz.id, true)}</select></label></div>
     <div class="kpi-row">
+      ${isHub ? `
+      <div class="kpi"><h3>Межгород через хаб</h3><div class="metric small">${num(viaHub.length)}</div><div class="hint">заказов с сегментами магистрали HUB-KZN</div></div>
+      <div class="kpi"><h3>Ожидают отправки</h3><div class="metric small ${hubWait.length ? "warn" : ""}">${num(hubWait.length)}</div><div class="hint">собраны в ПВЗ-источнике, ждут переадресации</div></div>
+      <div class="kpi"><h3>В пути</h3><div class="metric small">${num(hubWay.length)}</div><div class="hint">переданы в магистраль</div></div>
+      <div class="kpi"><h3>Логистика по магистрали</h3><div class="metric small">${money(trunkSum)}</div><div class="hint">хаб — узел графа: ячейки и приёмка не моделируются (заглушка)</div></div>` : `
       <div class="kpi"><h3>Загрузка ячеек</h3><div class="metric small ${over ? "bad" : ""}">${dec(pvz.utilization_pct)}%</div>
         <div class="gauge ${over ? "over" : ""}"><span style="width:${Math.min(100, pvz.utilization_pct)}%"></span><i style="left:${thr}%"></i></div>
         <div class="gauge-label"><b style="left:${thr}%">порог ${dec(thr)}%</b></div>
@@ -180,10 +201,10 @@ async function renderPvzCab() {
       <div class="kpi"><h3>Рейтинг точки</h3><div class="metric small"><span class="rating rating-${esc(rating)}">${esc(rating)}</span></div><div class="hint">шкала A–D по сверкам</div></div>
       <div class="kpi"><h3>Прибыль за период</h3><div class="metric small ${analytics.profit_rub >= 0 ? "good" : "bad"}">${money(analytics.profit_rub)}</div><div class="hint">выдано заказов: ${analytics.orders_issued}</div></div>
       <div class="kpi"><h3>Безубыточность</h3><div class="metric small">${m.breakeven.ops} оп/день</div>
-        <div class="hint">${m.breakeven.ops} оп/день при ${Math.round(m.params.mesh_share * 100)}% mesh · ${noMesh.breakeven.ops} оп/день без бонуса · бонус +${money(m.params.mesh_bonus_rub)} · постоянные ${money(m.params.fixed_cost_day_rub)}/день</div></div>
+        <div class="hint">${m.breakeven.ops} оп/день при ${Math.round(m.params.mesh_share * 100)}% mesh · ${noMesh.breakeven.ops} оп/день без бонуса · бонус +${money(m.params.mesh_bonus_rub)} · постоянные ${money(m.params.fixed_cost_day_rub)}/день</div></div>`}
     </div>
-    <div class="card accent"><h2>Задания от маркетплейса</h2>${tasks || '<div class="empty">Активных заданий нет</div>'}</div>
-    <div class="card"><h2>Приёмка от продавца</h2>
+    <div class="card accent"><h2>${isHub ? "Переадресация межгорода" : "Задания от маркетплейса"}</h2>${tasks || `<div class="empty">${isHub ? "Межгородских заказов нет" : "Активных заданий нет"}</div>`}</div>
+    ${isHub ? `<div class="card"><h2>Хаб как узел графа</h2><div class="hint">HUB-KZN — помеченная заглушка: ячейки, приёмка и выдача не моделируются. Хаб не хранит товар, он принимает собранный заказ из ПВЗ-источника и передаёт его в магистраль; фактическая выдача идёт в ПВЗ города-получателя. Заказ нельзя выдать до переадресации: API вернёт <span class="mono">409</span> и подскажет вызвать <span class="mono">POST /orders/{id}/transit</span>.</div></div>` : `<div class="card"><h2>Приёмка от продавца</h2>
       <form id="accept-form" class="form-row">
         <label>SKU<input name="sku" required placeholder="TD-2001" /></label>
         <label>Наименование<input name="title" required placeholder="Наушники" /></label>
@@ -192,9 +213,10 @@ async function renderPvzCab() {
         <label>Ячеек/шт.<input name="cell_size" type="number" min="1" max="10" value="1" required /></label>
         <label>Цена, ₽<input name="price_rub" type="number" min="1" value="${m.params.goods_rub}" required /></label>
         <button class="btn big" type="submit">Принять</button>
-      </form></div>`;
+      </form></div>`}`;
   $("#pvz-select").addEventListener("change", (e) => { state.pvzId = Number(e.target.value); render(); });
-  $("#accept-form").addEventListener("submit", async (event) => {
+  const acceptForm = $("#accept-form");
+  if (acceptForm) acceptForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const f = new FormData(event.target);
     const body = { sku: f.get("sku"), title: f.get("title"), seller_id: Number(f.get("seller_id")), qty: Number(f.get("qty")), cell_size: Number(f.get("cell_size")), price_rub: Number(f.get("price_rub")), pvz_id: pvz.id };
