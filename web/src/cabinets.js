@@ -106,6 +106,9 @@ async function renderSellerCab() {
   const [analytics, plan] = await Promise.all([api(`/analytics/seller?seller_id=${seller.id}`), sellerPlan(seller, m)]);
   const best = plan.good[0];
   const ref = m.order.mesh.seller;
+  /* SKU продавца для формы поставки: свои товары + возможность завести новый. */
+  const skuList = [...new Map(state.items.filter((i) => i.seller_id === seller.id).map((i) => [i.sku, i])).values()];
+  const skuOpts = skuList.map((i) => `<option value="${esc(i.sku)}" data-title="${esc(i.title)}" data-price="${i.price_rub}" data-cell="${i.cell_size}">${esc(i.sku)} · ${esc(i.title)}</option>`).join("");
   const rows = state.items.filter((i) => i.seller_id === seller.id).map((i) => {
     const a = ageCell(i);
     return `<tr><td><strong>${esc(i.sku)}</strong><br><span class="muted small">${esc(i.title)}</span></td><td>${esc(i.stored_pvz_code)}</td>
@@ -122,6 +125,19 @@ async function renderSellerCab() {
         : `<p>Сейчас нет SKU со скорингом ≥ 60 и свободными ячейками — партию лучше отправить на стандартный хаб / FBW.</p>`}
       ${plan.rest.length ? `<div class="hint">Неходовые SKU (${plan.rest.map((s) => `${esc(s.it.sku)}: ${s.score === null ? "—" : dec(s.score)}`).join(", ")}) идут на стандартный хаб / FBW.</div>` : ""}
       <div class="hint">Приёмка ${money(m.params.acceptance_cost_rub ?? 8)}/шт.</div></div>
+    <div class="card"><h2>Отправить поставку в ПВЗ</h2>
+      <form id="supply-form" class="form-row">
+        <label>Товар<select name="sku" id="supply-sku">${skuOpts}<option value="__new__">＋ новый SKU</option></select></label>
+        <label>Новый SKU<input name="sku_new" id="supply-sku-new" placeholder="TD-2001" disabled /></label>
+        <label>Наименование<input name="title" id="supply-title" placeholder="Наушники" /></label>
+        <label>Количество<input name="qty" type="number" min="1" value="${BATCH_QTY}" required /></label>
+        <label>Ячеек/шт.<input name="cell_size" type="number" min="1" max="10" value="1" required /></label>
+        <label>Цена, ₽<input name="price_rub" type="number" min="1" value="${m.params.goods_rub}" required /></label>
+        <label>ПВЗ назначения<select name="pvz_id">${pvzOptions(state.pvzId)}</select></label>
+        <button class="btn big" type="submit">Отправить поставку в ПВЗ</button>
+      </form>
+      <div class="hint">Партия уходит на точку и сразу появляется в кабинете ПВЗ: контракт API фиксирован (40 путей), отдельного статуса «поставка в пути» нет — приёмка на ПВЗ фиксируется в момент отправки поставки. Приёмка ${money(m.params.acceptance_cost_rub ?? 8)}/шт списывает ячейки точки.</div>
+    </div>
     <div class="grid cols-4">
       <div><h3>Выручка от товаров</h3><div class="metric small">${money(analytics.revenue.goods_rub)}</div><div class="hint">${analytics.orders.length} зак. в периоде</div></div>
       <div><h3>Комиссия маркетплейса</h3><div class="metric small bad">−${money(analytics.costs.commission_rub)}</div><div class="hint">${seller.commission_pct}% от товара</div></div>
@@ -135,6 +151,45 @@ async function renderSellerCab() {
     <div class="card"><h2>Прибыль по заказам</h2>${table([{ title: "Заказ" }, { title: "Статус" }, { title: "Товар", num: true }, { title: "Комиссия", num: true }, { title: "Нетто", num: true }], orderRows, "Заказов ещё нет")}
       <div class="hint">Выручка по заказам: ${money(analytics.revenue.goods_rub)}, прибыль по ledger: ${money(analytics.profit_rub)}.</div></div>`;
   $("#seller-select").addEventListener("change", (e) => { state.sellerId = Number(e.target.value); render(); });
+  const supplyForm = $("#supply-form");
+  if (supplyForm) {
+    const skuSel = $("#supply-sku");
+    const skuNew = $("#supply-sku-new");
+    const fill = () => {
+      const opt = skuSel.selectedOptions[0];
+      const isNew = skuSel.value === "__new__";
+      skuNew.disabled = !isNew;
+      if (isNew) { $("#supply-title").value = ""; return; }
+      $("#supply-title").value = opt.dataset.title || "";
+      supplyForm.elements.price_rub.value = opt.dataset.price || supplyForm.elements.price_rub.value;
+      supplyForm.elements.cell_size.value = opt.dataset.cell || 1;
+    };
+    skuSel.addEventListener("change", fill);
+    fill();
+    supplyForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const f = new FormData(supplyForm);
+      const sku = String(f.get("sku") === "__new__" ? f.get("sku_new") : f.get("sku") || "").trim();
+      if (!sku) return toast("Укажите SKU поставки", "error");
+      const body = {
+        sku,
+        seller_id: seller.id,
+        title: String(f.get("title") || "").trim() || sku,
+        qty: Number(f.get("qty")),
+        cell_size: Number(f.get("cell_size")),
+        price_rub: Number(f.get("price_rub")),
+        pvz_id: Number(f.get("pvz_id")),
+      };
+      await withBusy(supplyForm, async () => {
+        const r = await guard(api("/items", { method: "POST", body }));
+        if (r) {
+          const to = state.pvz.find((p) => p.id === body.pvz_id);
+          toast(`Поставка ${r.sku}: ${r.qty} шт. принята в ${to ? to.code : "ПВЗ"} (+${r.cells} яч.)`, "ok");
+          await refreshAfterAction();
+        }
+      });
+    });
+  }
 }
 
 document.addEventListener("click", async (event) => {
@@ -185,6 +240,7 @@ async function renderPvzCab() {
         ...toIssue.map((o) => task(o, "Выдать", "issue", "good", "выдать покупателю")),
       ].join("");
   const sellers = state.sellers.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+  const stockHere = state.items.filter((i) => i.stored_pvz_id === pvz.id);
   pageBox().innerHTML = `
     <div class="section-title"><h2>${esc(pvz.code)} · ${esc(pvz.name)}</h2>
       <label>${isHub ? "Узел сети" : "Точка"}<select id="pvz-select">${pvzOptions(pvz.id, true)}</select></label></div>
@@ -204,6 +260,13 @@ async function renderPvzCab() {
         <div class="hint">${m.breakeven.ops} оп/день при ${Math.round(m.params.mesh_share * 100)}% mesh · ${noMesh.breakeven.ops} оп/день без бонуса · бонус +${money(m.params.mesh_bonus_rub)} · постоянные ${money(m.params.fixed_cost_day_rub)}/день</div></div>`}
     </div>
     <div class="card accent"><h2>${isHub ? "Переадресация межгорода" : "Задания от маркетплейса"}</h2>${tasks || `<div class="empty">${isHub ? "Межгородских заказов нет" : "Активных заданий нет"}</div>`}</div>
+    ${isHub ? "" : `<div class="card"><h2>Принятые поставки на ${esc(pvz.code)}</h2>
+      ${table([{ title: "Товар" }, { title: "Продавец" }, { title: "Кол-во", num: true }, { title: "Ячеек/шт", num: true }, { title: "Занято ячеек", num: true }, { title: "Принято" }, { title: "Статус" }],
+        stockHere.map((i) => `<tr><td><strong>${esc(i.sku)}</strong><br><span class="muted small">${esc(i.title)}</span></td>
+          <td>${esc((state.sellers.find((s) => s.id === i.seller_id) || {}).name || "—")}</td>
+          <td class="num">${i.qty}</td><td class="num">${i.cell_size}</td><td class="num">${i.cells}</td>
+          <td class="muted small">${dt(i.accepted_at)}</td><td>${pill(i.status)}</td></tr>`), "Поставок на точку ещё не было")}
+      <div class="hint">Приёмка выполняется автоматически при отправке поставки продавцом (контракт API — 40 путей, отдельного статуса «в пути к ПВЗ» нет). Приёмка занимает ячейки точки и стоит ПВЗ ${money(m.params.acceptance_cost_rub ?? 8)} за единицу — эта сумма уже учтена в «Прибыли за период».</div></div>`}
     ${isHub ? `<div class="card"><h2>Хаб как узел графа</h2><div class="hint">HUB-KZN — помеченная заглушка: ячейки, приёмка и выдача не моделируются. Хаб не хранит товар, он принимает собранный заказ из ПВЗ-источника и передаёт его в магистраль; фактическая выдача идёт в ПВЗ города-получателя. Заказ нельзя выдать до переадресации: API вернёт <span class="mono">409</span> и подскажет вызвать <span class="mono">POST /orders/{id}/transit</span>.</div></div>` : `<div class="card"><h2>Приёмка от продавца</h2>
       <form id="accept-form" class="form-row">
         <label>SKU<input name="sku" required placeholder="TD-2001" /></label>
