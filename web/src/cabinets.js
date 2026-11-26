@@ -290,6 +290,124 @@ async function renderPvzCab() {
   });
 }
 
+/* ---------- Маркетплейс: как выбирается маршрут (интерактивно) ---------- */
+function cmpSelects(fromId, toId) {
+  const opt = (id) => state.pvz.map((p) => `<option value="${p.id}" ${p.id === id ? "selected" : ""}>${esc(p.code)} · ${esc(p.name)}</option>`).join("");
+  return { from: opt(fromId), to: opt(toId) };
+}
+
+const rub2 = (v) => new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + " ₽";
+const segWord = (n) => (n % 10 === 1 && n % 100 !== 11 ? `${n} сегмент` : `${n} сегмента`);
+
+function schemeCard(title, scheme, win) {
+  if (!scheme || !scheme.available) {
+    return `<div class="scheme alt"><div class="scheme-head"><span class="route-badge hub">${esc(title)}</span><b>недоступно</b></div>
+      <div class="hint">у этих точек нет такого маршрута в текущей сети</div></div>`;
+  }
+  const legs = (scheme.segments || []).map((g) => `<li>${esc(g.from_code)} → ${esc(g.to_code)}<span>${rub(g.cost_rub)} · ${dec(g.hours)} ч</span></li>`).join("");
+  return `<div class="scheme ${win ? "win" : "alt"}">
+      <div class="scheme-head"><span class="route-badge ${scheme.kind === "mesh" ? "mesh" : "hub"}">${esc(scheme.kind === "mesh" ? "MESH" : "ХАБ")}</span>
+        <b>${rub(scheme.total_cost_rub)} · ${dec(scheme.total_hours)} ч</b>${win ? '<span class="pill">выбран API</span>' : ""}</div>
+      <ul class="legs">${legs || "<li>без сегментов</li>"}</ul>
+      <div class="hint">${esc(title)}: ${segWord((scheme.segments || []).length)}, себестоимость логистики складывается из них</div>
+    </div>`;
+}
+
+function compareBlock(cmp) {
+  const load = cmp.load || {};
+  const pct = (o) => (o ? dec(o.utilization_pct) + "%" : "—");
+  const triggered = (load.triggered_by || []).map((r) => `${esc(r.code)} ${dec(r.utilization_pct)}%`).join(", ");
+  return `<div class="grid cols-2">
+      ${schemeCard("Локально ПВЗ→ПВЗ", cmp.mesh, cmp.chosen === "mesh")}
+      ${schemeCard("Через хаб и магистраль", cmp.hub, cmp.chosen === "hub")}
+    </div>
+    <div class="card"><h2>Решение API: ${esc(cmp.reason_code || "—")}</h2>
+      <p>${esc(cmp.reason || "—")}</p>
+      <div class="list mt">
+        <div class="list-item small">Порог перелива <strong>${dec(load.threshold_pct)}%</strong> — выше него маршрут уходит на хаб</div>
+        <div class="list-item small">Загрузка отправителя: <strong>${pct(load.from)}</strong> ${load.from ? "(" + esc(load.from.code) + ")" : ""} · получателя: <strong>${pct(load.to)}</strong> ${load.to ? "(" + esc(load.to.code) + ")" : ""}</div>
+        <div class="list-item small">Сработал перелив: <strong>${load.triggered ? "да — " + esc(triggered) : "нет"}</strong></div>
+      </div>
+      <div class="hint">Хотите увидеть перелив — демо-кокпит, шаг «Пик / overflow 85%»: он поднимает загрузку точки до порога, после чего тот же расчёт выбирает хаб.</div>
+    </div>`;
+}
+
+async function renderRouting() {
+  const m = await econ();
+  const bp = m.order.compare || {};
+  const sc = m.order;
+  const pts = points();
+  const q0 = pts[0], q1 = pts[1] || pts[0];
+  const hubPoint = state.pvz.find((p) => p.is_hub);
+  const intercity = state.pvz.find((p) => !p.is_hub && q0 && p.city !== q0.city);
+  const sel = cmpSelects(q0.id, q1.id);
+  const money = (v) => rub(v);
+  const parts = [
+    { label: "Маркетплейс (WB)", v: bp.marketplace_delta_rub || 0, tone: "good" },
+    { label: "ПВЗ (бонус за заказ без хаба)", v: bp.pvz_delta_rub || 0, tone: "good" },
+    { label: "Покупатель (дешевле доставка)", v: -(bp.buyer_delta_rub || 0), tone: "good" },
+  ];
+  const saving = parts.reduce((sum, p) => sum + p.v, 0);
+  const logist = Math.round(((sc.hub.route.cost_rub - sc.mesh.route.cost_rub) * 100)) / 100;
+  const bars = parts.map((p) => `<div class="split-row"><span>${esc(p.label)}</span>
+      <div class="bar"><span style="width:${saving ? (p.v / saving) * 100 : 0}%"></span></div>
+      <b>${p.v > 0 ? "+" : p.v < 0 ? "−" : ""}${rub2(Math.abs(p.v))}</b><span class="muted small">${saving ? dec(((p.v / saving) * 100).toFixed(1)) : 0}%</span></div>`).join("");
+  const checks = [
+    `Проверка сходимости: ${parts.map((p) => (p.v > 0 ? "+" : p.v < 0 ? "−" : "") + rub2(Math.abs(p.v))).join(" + ")} = ${rub2(saving)} — совпадает с разницей логистики ${money(sc.hub.route.cost_rub)} − ${money(sc.mesh.route.cost_rub)} = ${rub2(logist)}`,
+    `Продавец: ${(bp.seller_delta_rub || 0) > 0 ? "+" : (bp.seller_delta_rub || 0) < 0 ? "−" : ""}${rub2(Math.abs(bp.seller_delta_rub || 0))} — прибыль не зависит от схемы (${money(sc.mesh.seller.profit_rub)} в обеих)`,
+    `Срок: ${dec(sc.mesh.route.hours)} ч против ${dec(sc.hub.route.hours)} ч — mesh быстрее на ${dec(Math.abs(sc.mesh.route.hours - sc.hub.route.hours))} ч`,
+    `Доставка покупателю: ${money(m.params.buyer_delivery_fee_local_rub)} против ${money(m.params.buyer_delivery_fee_hub_rub)}`,
+  ];
+  pageBox().innerHTML = `
+    <div class="card accent"><h2>Как маркетплейс выбирает, как везти заказ</h2>
+      <p class="hint">API считает обе схемы по одному набору тарифов и берёт дешёвую, соблюдая ограничения: есть ли локальный сегмент, активны ли узлы, не перегружена ли точка. Ниже — тот же расчёт, что при оформлении заказа: <span class="mono">GET /api/v1/routes/compare</span>.</p>
+      <div class="form-row mt">
+        <label>Откуда<select id="cmp-from">${sel.from}</select></label>
+        <label>Куда<select id="cmp-to">${sel.to}</select></label>
+        <button class="btn big" id="cmp-run">Посчитать маршрут</button>
+      </div>
+      <div class="inline mt">
+        <button class="btn ghost small" data-cmp-preset="urban">Пример: городской mesh</button>
+        <button class="btn ghost small" data-cmp-preset="intercity">Пример: межгород через хаб</button>
+        <button class="btn ghost small" data-cmp-preset="hub">Откуда — не хаб, куда — ${esc(hubPoint ? hubPoint.code : "хаб")}</button>
+      </div>
+    </div>
+    <div id="cmp-out"></div>
+    <div class="card"><h2>Как делится выгода: mesh против хаба</h2>
+      <div class="grid cols-3">
+        <div><h3>Логистика mesh</h3><div class="metric small good">${rub(sc.mesh.route.cost_rub)}</div><div class="hint">${dec(sc.mesh.route.hours)} ч</div></div>
+        <div><h3>Логистика через хаб</h3><div class="metric small">${rub(sc.hub.route.cost_rub)}</div><div class="hint">${dec(sc.hub.route.hours)} ч</div></div>
+        <div><h3>Экономия на заказ</h3><div class="metric small good">${rub2(logist)}</div><div class="hint">разница себестоимости логистики</div></div>
+      </div>
+      <div class="split mt">${bars}</div>
+      <div class="list mt">${checks.map((c) => `<div class="list-item small">${c}</div>`).join("")}</div>
+      <div class="hint">Правило выбора: есть локальный сегмент и точка не перегружена — mesh (<span class="mono">mesh_same_city</span> / <span class="mono">mesh_cheapest</span>); загрузка получателя выше ${dec(m.queue_threshold ? m.queue_threshold.alert_pct : 85)}% — <span class="mono">overflow_to_hub</span>; локального маршрута нет — <span class="mono">hub_required</span>. Все цифры приходят из <span class="mono">/economics/scenario</span> и <span class="mono">/routes/compare</span>; в вёрстке констант нет.</div>
+    </div>`;
+  const run = async () => {
+    const from = Number($("#cmp-from").value), to = Number($("#cmp-to").value);
+    const out = $("#cmp-out");
+    out.innerHTML = '<div class="card empty">считаю по API…</div>';
+    try {
+      if (from === to) throw new Error("точка отправления и выдачи совпадают — выберите разные");
+      const cmp = await api(`/routes/compare?from=${from}&to=${to}&accept_latency=true`);
+      out.innerHTML = compareBlock(cmp);
+    } catch (e) {
+      out.innerHTML = `<div class="card"><h2>Не получилось посчитать</h2><p>${esc(e.message)}</p></div>`;
+    }
+  };
+  $("#cmp-run").addEventListener("click", run);
+  $("#cmp-from").addEventListener("change", run);
+  $("#cmp-to").addEventListener("change", run);
+  document.querySelectorAll("[data-cmp-preset]").forEach((b) => b.addEventListener("click", () => {
+    const set = (id, v) => { const el = $(id); if (el) el.value = String(v); };
+    if (b.dataset.cmpPreset === "intercity" && intercity && q0) { set("#cmp-from", q0.id); set("#cmp-to", intercity.id); }
+    if (b.dataset.cmpPreset === "hub" && hubPoint && q0) { set("#cmp-from", q0.id); set("#cmp-to", hubPoint.id); }
+    if (b.dataset.cmpPreset === "urban") { set("#cmp-from", q0.id); set("#cmp-to", q1.id); }
+    run();
+  }));
+  run();
+}
+
 /* ---------- Маркетплейс: решение о маршруте ---------- */
 function routeReason(o) {
   const r = o.route || {};

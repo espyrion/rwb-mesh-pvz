@@ -478,3 +478,18 @@ input[type="range"]::-moz-range-thumb { border-color: var(--role); }
   .role-btn { flex: 1; padding: 10px 6px; }
   .pagehead, .page, .subnav { padding-left: 16px; padding-right: 16px; }
 }
+
+/* ---------- выбор маршрута: схемы и распределение выгоды ---------- */
+.scheme { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.scheme.win { border-color: var(--good); box-shadow: inset 0 0 0 1px var(--good); background: linear-gradient(180deg, #F0FDF9, #fff); }
+.scheme.alt { opacity: .92; }
+.scheme-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.scheme-head b { font-size: 19px; font-variant-numeric: tabular-nums; }
+.scheme-head .pill { margin-left: auto; }
+.legs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.legs li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 7px 10px; background: var(--panel-2); border-radius: 8px; font-variant-numeric: tabular-nums; }
+.legs li span { color: var(--muted); white-space: nowrap; }
+.split { display: grid; gap: 10px; }
+.split-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(120px, 2fr) auto auto; gap: 12px; align-items: center; font-size: 13px; }
+.split-row b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.split-row .bar { height: 10px; }

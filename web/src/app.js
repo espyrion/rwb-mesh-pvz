@@ -1597,13 +1597,14 @@ const ROLE_META = {
 };
 const ROLE_PAGES = {
   buyer: ["buyer"], seller: ["seller"], pvz: ["pvz"],
-  admin: ["dashboard", "map", "economics", "ledger", "incidents", "demo"],
+  admin: ["dashboard", "routing", "map", "economics", "ledger", "incidents", "demo"],
 };
 const pages = {
   buyer: { title: "Кабинет покупателя", subtitle: ROLE_META.buyer.subtitle, render: renderBuyerCab },
   seller: { title: "Кабинет продавца", subtitle: ROLE_META.seller.subtitle, render: renderSellerCab },
   pvz: { title: "Кабинет ПВЗ", subtitle: ROLE_META.pvz.subtitle, render: renderPvzCab },
   dashboard: { title: "Дашборд", subtitle: "Сводка по сети, денежные потоки и маршруты заказов", render: renderAdminDashboard },
+  routing: { title: "Как выбирается маршрут", subtitle: "Считаем обе схемы по одним тарифам и берём дешёвую", render: renderRouting },
   map: { title: "Карта сети", subtitle: "Схема ПВЗ, сегментов и маршрутов: отказ узла прямо на карте", render: () => renderMap() },
   economics: { title: "Экономика", subtitle: "Зелёная зона 4 сторон и бонус ПВЗ", render: renderEconomics },
   ledger: { title: "Журнал проводок", subtitle: "Ledger: начисления по сторонам", render: renderLedger },
