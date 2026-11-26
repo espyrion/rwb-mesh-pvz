@@ -123,11 +123,13 @@ async function renderSellerCab() {
       ${plan.rest.length ? `<div class="hint">Неходовые SKU (${plan.rest.map((s) => `${esc(s.it.sku)}: ${s.score === null ? "—" : dec(s.score)}`).join(", ")}) идут на стандартный хаб / FBW.</div>` : ""}
       <div class="hint">Приёмка ${money(m.params.acceptance_cost_rub ?? 8)}/шт.</div></div>
     <div class="grid cols-4">
-      <div><h3>Товар (эталон)</h3><div class="metric small">${money(ref.revenue.goods)}</div></div>
-      <div><h3>Комиссия</h3><div class="metric small bad">−${money(ref.costs.commission)}</div><div class="hint">${seller.commission_pct}% от товара</div></div>
-      <div><h3>Логистика + хранение</h3><div class="metric small bad">−${money(ref.costs.logistics + ref.costs.storage)}</div><div class="hint">логистика ${money(ref.costs.logistics)}, хранение ${rub(ref.costs.storage)}</div></div>
-      <div><h3>Прибыль продавца</h3><div class="metric small good">${rub(ref.profit_rub)}</div><div class="hint">с заказа: mesh и хаб одинаково</div></div>
+      <div><h3>Выручка от товаров</h3><div class="metric small">${money(analytics.revenue.goods_rub)}</div><div class="hint">${analytics.orders.length} зак. в периоде</div></div>
+      <div><h3>Комиссия маркетплейса</h3><div class="metric small bad">−${money(analytics.costs.commission_rub)}</div><div class="hint">${seller.commission_pct}% от товара</div></div>
+      <div><h3>Возвраты</h3><div class="metric small bad">−${money(analytics.costs.refunds_rub)}</div><div class="hint">возврат 7 дней</div></div>
+      <div><h3>Прибыль продавца</h3><div class="metric small ${analytics.profit_rub >= 0 ? "good" : "bad"}">${money(analytics.profit_rub)}</div><div class="hint">нетто по выданным заказам</div></div>
     </div>
+    <div class="card"><h2>Юнит-экономика эталонного заказа (${money(m.params.goods_rub)} товар)</h2>
+      <div class="hint">Комиссия ${money(ref.costs.commission)}, логистика ${money(ref.costs.logistics)}, хранение ${rub(ref.costs.storage)} → прибыль <strong>${rub(ref.profit_rub)}</strong> (${dec(ref.margin_pct)}%). Приёмка на ПВЗ ${money(m.params.acceptance_cost_rub ?? 8)}/шт. Суммы выше — факт по выданным заказам, ниже — модель на один заказ.</div></div>
     <div class="card"><h2>Остатки по ПВЗ</h2>${table([{ title: "Товар" }, { title: "Точка" }, { title: "Кол-во", num: true }, { title: "Хранение" }, { title: "" }], rows, "Нет товаров")}
       <div class="hint">Зелёный &lt; 14 дн · жёлтый 14–21 дн · красный &gt; 21 дн (алерт, вывоз за ${dec(m.params.relocation_cost_rub ?? 60)} ₽).</div></div>
     <div class="card"><h2>Прибыль по заказам</h2>${table([{ title: "Заказ" }, { title: "Статус" }, { title: "Товар", num: true }, { title: "Комиссия", num: true }, { title: "Нетто", num: true }], orderRows, "Заказов ещё нет")}
