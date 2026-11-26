@@ -157,11 +157,15 @@ async function renderPvzCab() {
   const over = pvz.utilization_pct >= thr;
   const mine = state.orders;
   const toCollect = mine.filter((o) => o.from_pvz === pvz.id && ["routed", "rerouted"].includes(o.status));
-  const toIssue = mine.filter((o) => o.to_pvz === pvz.id && ["assembled", "in_transit"].includes(o.status));
+  /* Межгородской (hub) заказ нельзя выдать из «Собран»: сначала передача курьеру (transit).
+     Локальный mesh-заказ API разрешает выдать сразу после сборки. */
+  const toTransit = mine.filter((o) => o.to_pvz === pvz.id && o.status === "assembled" && o.route && o.route.kind !== "mesh");
+  const toIssue = mine.filter((o) => o.to_pvz === pvz.id && (o.status === "in_transit" || (o.status === "assembled" && o.route && o.route.kind === "mesh")));
   const task = (o, label, action, cls, what) => `<div class="task"><div><strong>${esc(o.code)}</strong> · ${esc(o.title || o.sku)} × ${o.qty}<br><span class="muted small">${what} · ${esc(o.from_code)} → ${esc(o.to_code)}</span></div>
     <button class="btn big ${cls}" data-action="${action}" data-id="${o.id}">${label}</button></div>`;
   const tasks = [
-    ...toCollect.map((o) => task(o, "Собрать", "assemble", "", "передать курьеру в SLA")),
+    ...toCollect.map((o) => task(o, "Собрать", "assemble", "", "принять у продавца и уложить в ячейки")),
+    ...toTransit.map((o) => task(o, "В путь", "transit", "", `передать курьеру: магистраль ${dec(o.route.total_hours)} ч, ${money(o.route.total_cost_rub)} — выдача после отправки`)),
     ...toIssue.map((o) => task(o, "Выдать", "issue", "good", "выдать покупателю")),
   ].join("");
   const sellers = state.sellers.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
